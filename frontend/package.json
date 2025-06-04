@@ -8,10 +8,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@types/node": "^20.8.10",
+    "@types/react": "^18.2.34",
+    "@types/react-dom": "^18.2.14",
     "axios": "^1.6.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.17.0"
+    "react-router-dom": "^6.17.0",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.1.0",
