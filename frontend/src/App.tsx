@@ -31,7 +31,7 @@ function App() {
             <AssetsPage />
           </ProtectedRoute>
         } />
-        <Route path="/" element={<Navigate to="/investments" replace />} />
+        <Route path="/" element={<Navigate to="/investments\" replace />} />
       </Routes>
     </BrowserRouter>
   );
