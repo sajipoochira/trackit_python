@@ -10,4 +10,5 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY . /app/
 
-CMD ["gunicorn", "trackit_backend.wsgi:application", "--bind", "0.0.0.0:8000"]
+# Add migration commands before running the server
+CMD python manage.py makemigrations && python manage.py migrate && gunicorn trackit_backend.wsgi:application --bind 0.0.0.0:8000
