@@ -1,0 +1,1 @@
+export default function AssetsPage() { return <div>Assets Page (to be extended)</div>; }

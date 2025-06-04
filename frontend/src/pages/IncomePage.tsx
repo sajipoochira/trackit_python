@@ -1,0 +1,1 @@
+export default function IncomePage() { return <div>Income Page (to be extended)</div>; }

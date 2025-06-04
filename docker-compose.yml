@@ -1,0 +1,12 @@
+version: '3.9'
+
+services:
+  web:
+    build: ./backend
+    command: gunicorn trackit_backend.wsgi:application --bind 0.0.0.0:8000
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=1
