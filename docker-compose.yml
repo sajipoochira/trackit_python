@@ -10,3 +10,33 @@ services:
       - "8000:8000"
     environment:
       - DEBUG=1
+      - DATABASE_URL=postgresql://trackit:trackit@db:5432/trackit
+      - DJANGO_SECRET_KEY=your-secret-key-for-development
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - web
+
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=trackit
+      - POSTGRES_USER=trackit
+      - POSTGRES_PASSWORD=trackit
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data:

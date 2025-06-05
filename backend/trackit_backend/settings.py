@@ -35,8 +35,12 @@ WSGI_APPLICATION = 'trackit_backend.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('POSTGRES_DB', 'trackit'),
+        'USER': os.environ.get('POSTGRES_USER', 'trackit'),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'trackit'),
+        'HOST': os.environ.get('POSTGRES_HOST', 'db'),
+        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
     }
 }
 
