@@ -1,0 +1,24 @@
+# React frontend
+/frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env
+frontend/.env.*
+
+# Django backend
+/backend/__pycache__/
+backend/*.py[cod]
+backend/db.sqlite3
+backend/*.log
+backend/**/migrations/*.py
+!backend/**/migrations/__init__.py
+backend/.env
+backend/.env.*
+
+# IDE + OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
