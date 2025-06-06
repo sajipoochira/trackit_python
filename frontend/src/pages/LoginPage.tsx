@@ -88,7 +88,7 @@ const LoginPage = () => {
                   >
                     {loading ? (
                       <>
-                        <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+                        <span className="spinner-border spinner-border-sm me-2\" role="status"></span>
                         Signing in...
                       </>
                     ) : (
