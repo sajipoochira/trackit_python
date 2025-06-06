@@ -8,12 +8,28 @@ const InvestmentsPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvPreview, setCsvPreview] = useState<any[]>([]);
+  const [uploadLoading, setUploadLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     type: '',
     current_value: '',
     purchase_value: '',
   });
+
+  const investmentTypes = [
+    'Stock',
+    'Bond',
+    'Mutual Fund',
+    'ETF',
+    'Cryptocurrency',
+    'Real Estate',
+    'Gold',
+    'Business',
+    'Other'
+  ];
 
   const load = async () => {
     try {
@@ -61,10 +77,150 @@ const InvestmentsPage = () => {
     }
   };
 
+  const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setCsvFile(file);
+      parseCsvFile(file);
+    }
+  };
+
+  const parseCsvFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const lines = text.split('\n').filter(line => line.trim());
+      
+      if (lines.length < 2) {
+        setError('CSV file must have at least a header row and one data row');
+        return;
+      }
+
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const expectedHeaders = ['name', 'type', 'purchase_value', 'current_value'];
+      
+      const hasAllHeaders = expectedHeaders.every(header => 
+        headers.some(h => h.includes(header.replace('_', '')))
+      );
+
+      if (!hasAllHeaders) {
+        setError('CSV must have columns: name, type, purchase_value, current_value');
+        return;
+      }
+
+      const data = lines.slice(1).map((line, index) => {
+        const values = line.split(',').map(v => v.trim());
+        const row: any = {};
+        
+        headers.forEach((header, i) => {
+          if (header.includes('name')) row.name = values[i];
+          else if (header.includes('type')) row.type = values[i];
+          else if (header.includes('purchase')) row.purchase_value = parseFloat(values[i]) || 0;
+          else if (header.includes('current')) row.current_value = parseFloat(values[i]) || 0;
+        });
+
+        row.id = `preview-${index}`;
+        return row;
+      }).filter(row => row.name && row.type);
+
+      setCsvPreview(data);
+      setError(null);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleBulkUpload = async () => {
+    if (csvPreview.length === 0) {
+      setError('No valid data to upload');
+      return;
+    }
+
+    setUploadLoading(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const item of csvPreview) {
+      try {
+        await createInvestment({
+          name: item.name,
+          type: item.type,
+          purchase_value: item.purchase_value,
+          current_value: item.current_value,
+        });
+        successCount++;
+      } catch (err) {
+        errorCount++;
+        console.error('Failed to create investment:', item.name, err);
+      }
+    }
+
+    setUploadLoading(false);
+    
+    if (errorCount === 0) {
+      setError(null);
+      alert(`Successfully uploaded ${successCount} investments!`);
+    } else {
+      setError(`Uploaded ${successCount} investments, ${errorCount} failed`);
+    }
+
+    setCsvFile(null);
+    setCsvPreview([]);
+    setShowBulkUpload(false);
+    load();
+  };
+
+  const downloadSampleCsv = () => {
+    const sampleData = [
+      'name,type,purchase_value,current_value',
+      'Apple Stock,Stock,150.00,175.50',
+      'Gold Investment,Gold,1800.00,1950.00',
+      'Tech Startup,Business,10000.00,12500.00',
+      'Bitcoin,Cryptocurrency,45000.00,42000.00'
+    ].join('\n');
+
+    const blob = new Blob([sampleData], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sample_investments.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   const calculateGainLoss = (current: number, purchase: number) => {
     const diff = current - purchase;
     const percentage = ((diff / purchase) * 100).toFixed(2);
     return { amount: diff, percentage };
+  };
+
+  const getTypeIcon = (type: string) => {
+    const icons: { [key: string]: string } = {
+      'Stock': 'bi-graph-up',
+      'Bond': 'bi-bank',
+      'Mutual Fund': 'bi-pie-chart',
+      'ETF': 'bi-collection',
+      'Cryptocurrency': 'bi-currency-bitcoin',
+      'Real Estate': 'bi-house',
+      'Gold': 'bi-gem',
+      'Business': 'bi-building',
+      'Other': 'bi-question-circle'
+    };
+    return icons[type] || 'bi-question-circle';
+  };
+
+  const getTypeColor = (type: string) => {
+    const colors: { [key: string]: string } = {
+      'Stock': 'primary',
+      'Bond': 'success',
+      'Mutual Fund': 'info',
+      'ETF': 'warning',
+      'Cryptocurrency': 'danger',
+      'Real Estate': 'dark',
+      'Gold': 'warning',
+      'Business': 'success',
+      'Other': 'secondary'
+    };
+    return colors[type] || 'secondary';
   };
 
   useEffect(() => {
@@ -78,19 +234,145 @@ const InvestmentsPage = () => {
           <i className="bi bi-graph-up me-2 text-primary"></i>
           Investments
         </h1>
-        <button
-          className="btn btn-primary"
-          onClick={() => setShowForm(!showForm)}
-        >
-          <i className="bi bi-plus-circle me-1"></i>
-          {showForm ? 'Cancel' : 'Add Investment'}
-        </button>
+        <div className="d-flex gap-2">
+          <button
+            className="btn btn-outline-primary"
+            onClick={() => setShowBulkUpload(!showBulkUpload)}
+          >
+            <i className="bi bi-upload me-1"></i>
+            Bulk Upload
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowForm(!showForm)}
+          >
+            <i className="bi bi-plus-circle me-1"></i>
+            {showForm ? 'Cancel' : 'Add Investment'}
+          </button>
+        </div>
       </div>
 
       {error && (
         <div className="alert alert-danger" role="alert">
           <i className="bi bi-exclamation-triangle me-2"></i>
           {error}
+        </div>
+      )}
+
+      {showBulkUpload && (
+        <div className="card mb-4">
+          <div className="card-header">
+            <h5 className="card-title mb-0">
+              <i className="bi bi-upload me-2"></i>
+              Bulk Upload Investments
+            </h5>
+          </div>
+          <div className="card-body">
+            <div className="row">
+              <div className="col-md-6">
+                <h6>Upload CSV File</h6>
+                <p className="text-muted small">
+                  Upload a CSV file with columns: name, type, purchase_value, current_value
+                </p>
+                <input
+                  type="file"
+                  className="form-control mb-3"
+                  accept=".csv"
+                  onChange={handleCsvFileChange}
+                />
+                <button
+                  className="btn btn-outline-secondary btn-sm"
+                  onClick={downloadSampleCsv}
+                >
+                  <i className="bi bi-download me-1"></i>
+                  Download Sample CSV
+                </button>
+              </div>
+              <div className="col-md-6">
+                <h6>Supported Investment Types</h6>
+                <div className="d-flex flex-wrap gap-1">
+                  {investmentTypes.map(type => (
+                    <span key={type} className={`badge bg-${getTypeColor(type)} me-1 mb-1`}>
+                      <i className={`${getTypeIcon(type)} me-1`}></i>
+                      {type}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {csvPreview.length > 0 && (
+              <div className="mt-4">
+                <h6>Preview ({csvPreview.length} investments)</h6>
+                <div className="table-responsive">
+                  <table className="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Purchase Value</th>
+                        <th>Current Value</th>
+                        <th>Gain/Loss</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {csvPreview.slice(0, 5).map((item, index) => {
+                        const gainLoss = calculateGainLoss(item.current_value, item.purchase_value);
+                        const isProfit = gainLoss.amount >= 0;
+                        return (
+                          <tr key={index}>
+                            <td>{item.name}</td>
+                            <td>
+                              <span className={`badge bg-${getTypeColor(item.type)}`}>
+                                {item.type}
+                              </span>
+                            </td>
+                            <td>${item.purchase_value.toFixed(2)}</td>
+                            <td>${item.current_value.toFixed(2)}</td>
+                            <td className={isProfit ? 'text-success' : 'text-danger'}>
+                              {isProfit ? '+' : ''}${gainLoss.amount.toFixed(2)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {csvPreview.length > 5 && (
+                    <p className="text-muted small">... and {csvPreview.length - 5} more</p>
+                  )}
+                </div>
+                <div className="d-flex gap-2 mt-3">
+                  <button
+                    className="btn btn-success"
+                    onClick={handleBulkUpload}
+                    disabled={uploadLoading}
+                  >
+                    {uploadLoading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2"></span>
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-check-circle me-1"></i>
+                        Upload {csvPreview.length} Investments
+                      </>
+                    )}
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setCsvFile(null);
+                      setCsvPreview([]);
+                      setShowBulkUpload(false);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -113,7 +395,7 @@ const InvestmentsPage = () => {
                     id="name"
                     value={formData.name}
                     onChange={e => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g., Apple Stock"
+                    placeholder="e.g., Apple Stock, Gold Coins, Tech Startup"
                     required
                   />
                 </div>
@@ -127,13 +409,9 @@ const InvestmentsPage = () => {
                     required
                   >
                     <option value="">Select type...</option>
-                    <option value="Stock">Stock</option>
-                    <option value="Bond">Bond</option>
-                    <option value="Mutual Fund">Mutual Fund</option>
-                    <option value="ETF">ETF</option>
-                    <option value="Cryptocurrency">Cryptocurrency</option>
-                    <option value="Real Estate">Real Estate</option>
-                    <option value="Other">Other</option>
+                    {investmentTypes.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -194,14 +472,23 @@ const InvestmentsPage = () => {
         <div className="text-center py-5">
           <i className="bi bi-graph-up text-muted" style={{ fontSize: '4rem' }}></i>
           <h3 className="text-muted mt-3">No investments yet</h3>
-          <p className="text-muted">Start tracking your investments by adding your first one!</p>
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowForm(true)}
-          >
-            <i className="bi bi-plus-circle me-1"></i>
-            Add Your First Investment
-          </button>
+          <p className="text-muted">Start tracking your investments by adding your first one or uploading a CSV file!</p>
+          <div className="d-flex gap-2 justify-content-center">
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowForm(true)}
+            >
+              <i className="bi bi-plus-circle me-1"></i>
+              Add Your First Investment
+            </button>
+            <button
+              className="btn btn-outline-primary"
+              onClick={() => setShowBulkUpload(true)}
+            >
+              <i className="bi bi-upload me-1"></i>
+              Upload CSV
+            </button>
+          </div>
         </div>
       ) : (
         <div className="row">
@@ -216,7 +503,10 @@ const InvestmentsPage = () => {
                     <div className="d-flex justify-content-between align-items-start mb-3">
                       <div>
                         <h5 className="card-title mb-1">{investment.name}</h5>
-                        <span className="badge bg-secondary">{investment.type}</span>
+                        <span className={`badge bg-${getTypeColor(investment.type)}`}>
+                          <i className={`${getTypeIcon(investment.type)} me-1`}></i>
+                          {investment.type}
+                        </span>
                       </div>
                       <button
                         className="btn btn-outline-danger btn-sm"
