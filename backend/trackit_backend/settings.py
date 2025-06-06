@@ -17,6 +17,7 @@ INSTALLED_APPS = [
     'finance',
     'users',
     'rest_framework_simplejwt',
+    
 ]
 
 MIDDLEWARE = [
@@ -39,7 +40,7 @@ DATABASES = {
         'NAME': os.environ.get('POSTGRES_DB', 'trackit'),
         'USER': os.environ.get('POSTGRES_USER', 'trackit'),
         'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'trackit'),
-        'HOST': os.environ.get('POSTGRES_HOST', 'db'),
+        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
         'PORT': os.environ.get('POSTGRES_PORT', '5432'),
     }
 }
@@ -64,3 +65,23 @@ CORS_ALLOW_CREDENTIALS = True
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Add or verify TEMPLATES setting
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
+# Add default auto field setting (optional but recommended)
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
