@@ -5,6 +5,7 @@ class Investment(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     type = models.CharField(max_length=50)
+    qty = models.IntegerField()
     current_value = models.FloatField()
     purchase_value = models.FloatField()
     created_at = models.DateTimeField(auto_now_add=True)

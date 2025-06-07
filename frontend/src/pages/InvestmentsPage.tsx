@@ -15,6 +15,7 @@ const InvestmentsPage = () => {
   const [formData, setFormData] = useState({
     name: '',
     type: '',
+    qty: '',
     current_value: '',
     purchase_value: '',
   });
@@ -51,12 +52,13 @@ const InvestmentsPage = () => {
       const data = {
         name: formData.name,
         type: formData.type,
+        qty: parseInt(formData.qty),
         current_value: parseFloat(formData.current_value),
         purchase_value: parseFloat(formData.purchase_value),
       };
 
       await createInvestment(data);
-      setFormData({ name: '', type: '', current_value: '', purchase_value: '' });
+      setFormData({ name: '', type: '',qty:'', current_value: '', purchase_value: '' });
       setShowForm(false);
       load();
     } catch (err: any) {
@@ -90,31 +92,32 @@ const InvestmentsPage = () => {
     reader.onload = (e) => {
       const text = e.target?.result as string;
       const lines = text.split('\n').filter(line => line.trim());
-      
+
       if (lines.length < 2) {
         setError('CSV file must have at least a header row and one data row');
         return;
       }
 
       const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-      const expectedHeaders = ['name', 'type', 'purchase_value', 'current_value'];
-      
-      const hasAllHeaders = expectedHeaders.every(header => 
+      const expectedHeaders = ['name', 'type', 'qty', 'purchase_value', 'current_value'];
+
+      const hasAllHeaders = expectedHeaders.every(header =>
         headers.some(h => h.includes(header.replace('_', '')))
       );
 
       if (!hasAllHeaders) {
-        setError('CSV must have columns: name, type, purchase_value, current_value');
+        setError('CSV must have columns: name, type,qty, purchase_value, current_value');
         return;
       }
 
       const data = lines.slice(1).map((line, index) => {
         const values = line.split(',').map(v => v.trim());
         const row: any = {};
-        
+
         headers.forEach((header, i) => {
           if (header.includes('name')) row.name = values[i];
           else if (header.includes('type')) row.type = values[i];
+          else if (header.includes('qty')) row.type = values[i];
           else if (header.includes('purchase')) row.purchase_value = parseFloat(values[i]) || 0;
           else if (header.includes('current')) row.current_value = parseFloat(values[i]) || 0;
         });
@@ -144,6 +147,7 @@ const InvestmentsPage = () => {
         await createInvestment({
           name: item.name,
           type: item.type,
+          qty: item.qty,
           purchase_value: item.purchase_value,
           current_value: item.current_value,
         });
@@ -155,7 +159,7 @@ const InvestmentsPage = () => {
     }
 
     setUploadLoading(false);
-    
+
     if (errorCount === 0) {
       setError(null);
       alert(`Successfully uploaded ${successCount} investments!`);
@@ -310,6 +314,7 @@ const InvestmentsPage = () => {
                       <tr>
                         <th>Name</th>
                         <th>Type</th>
+                        <th>QTY</th>
                         <th>Purchase Value</th>
                         <th>Current Value</th>
                         <th>Gain/Loss</th>
@@ -415,9 +420,24 @@ const InvestmentsPage = () => {
                   </select>
                 </div>
               </div>
+              
+                
               <div className="row">
+              <div className="col-md-6 mb-3">
+                  <label htmlFor="qty" className="form-label">QTY</label>
+                  <input
+                    type="number"
+                    step="1"
+                    className="form-control"
+                    id="qty"
+                    value={formData.qty}
+                    onChange={e => setFormData({ ...formData, qty: e.target.value })}
+                    placeholder="1"
+                    required
+                  />
+                </div>
                 <div className="col-md-6 mb-3">
-                  <label htmlFor="purchase_value" className="form-label">Purchase Value ($)</label>
+                  <label htmlFor="purchase_value" className="form-label">Purchase Value (₹)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -430,7 +450,7 @@ const InvestmentsPage = () => {
                   />
                 </div>
                 <div className="col-md-6 mb-3">
-                  <label htmlFor="current_value" className="form-label">Current Value ($)</label>
+                  <label htmlFor="current_value" className="form-label">Current Value (₹)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -495,7 +515,7 @@ const InvestmentsPage = () => {
           {investments.map((investment) => {
             const gainLoss = calculateGainLoss(investment.current_value, investment.purchase_value);
             const isProfit = gainLoss.amount >= 0;
-            
+
             return (
               <div key={investment.id} className="col-md-6 col-lg-4 mb-4">
                 <div className="card h-100 shadow-sm">
@@ -516,7 +536,7 @@ const InvestmentsPage = () => {
                         <i className="bi bi-trash"></i>
                       </button>
                     </div>
-                    
+
                     <div className="mb-3">
                       <div className="d-flex justify-content-between mb-2">
                         <span className="text-muted">Purchase Value:</span>
@@ -539,7 +559,7 @@ const InvestmentsPage = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="progress" style={{ height: '6px' }}>
                       <div
                         className={`progress-bar ${isProfit ? 'bg-success' : 'bg-danger'}`}

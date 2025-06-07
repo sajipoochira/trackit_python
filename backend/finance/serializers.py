@@ -22,3 +22,8 @@ class AssetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Asset
         fields = '__all__'
+
+
+class LTPResponseSerializer(serializers.Serializer):
+    symbol = serializers.CharField()
+    ltp = serializers.FloatField()

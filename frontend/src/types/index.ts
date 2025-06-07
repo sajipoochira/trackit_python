@@ -2,6 +2,7 @@ export interface Investment {
   id: number;
   name: string;
   type: string;
+  qty: number;
   current_value: number;
   purchase_value: number;
   created_at: string;
