@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchInvestments, createInvestment, deleteInvestment } from '../api/investments';
+import { fetchInvestments, createInvestment, deleteInvestment, updateInvestment, getLTP } from '../api/investments';
 import { Investment } from '../types';
 import Layout from '../components/Layout';
 
@@ -12,8 +12,10 @@ const InvestmentsPage = () => {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvPreview, setCsvPreview] = useState<any[]>([]);
   const [uploadLoading, setUploadLoading] = useState(false);
+  const [priceUpdateLoading, setPriceUpdateLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
+    symbol: '',
     type: '',
     qty: '',
     current_value: '',
@@ -51,6 +53,7 @@ const InvestmentsPage = () => {
     try {
       const data = {
         name: formData.name,
+        symbol: formData.symbol || undefined,
         type: formData.type,
         qty: parseInt(formData.qty),
         current_value: parseFloat(formData.current_value),
@@ -58,7 +61,7 @@ const InvestmentsPage = () => {
       };
 
       await createInvestment(data);
-      setFormData({ name: '', type: '',qty:'', current_value: '', purchase_value: '' });
+      setFormData({ name: '', symbol: '', type: '', qty: '', current_value: '', purchase_value: '' });
       setShowForm(false);
       load();
     } catch (err: any) {
@@ -76,6 +79,43 @@ const InvestmentsPage = () => {
         console.error(err);
         setError('Failed to delete investment');
       }
+    }
+  };
+
+  const handleRefreshPrices = async () => {
+    setPriceUpdateLoading(true);
+    let updatedCount = 0;
+    let errorCount = 0;
+
+    for (const investment of investments) {
+      if (investment.symbol && investment.type === 'Stock') {
+        try {
+          const priceData = await getLTP(investment.symbol);
+          const newCurrentValue = priceData.ltp * investment.qty;
+          
+          await updateInvestment(investment.id, {
+            current_value: newCurrentValue
+          });
+          updatedCount++;
+        } catch (err) {
+          console.error(`Failed to update price for ${investment.symbol}:`, err);
+          errorCount++;
+        }
+      }
+    }
+
+    setPriceUpdateLoading(false);
+    
+    if (updatedCount > 0) {
+      load(); // Reload to show updated prices
+    }
+
+    if (errorCount === 0 && updatedCount > 0) {
+      alert(`Successfully updated ${updatedCount} stock prices!`);
+    } else if (updatedCount === 0) {
+      alert('No stocks with symbols found to update');
+    } else {
+      alert(`Updated ${updatedCount} prices, ${errorCount} failed`);
     }
   };
 
@@ -106,7 +146,7 @@ const InvestmentsPage = () => {
       );
 
       if (!hasAllHeaders) {
-        setError('CSV must have columns: name, type,qty, purchase_value, current_value');
+        setError('CSV must have columns: name, type, qty, purchase_value, current_value (symbol is optional)');
         return;
       }
 
@@ -116,8 +156,9 @@ const InvestmentsPage = () => {
 
         headers.forEach((header, i) => {
           if (header.includes('name')) row.name = values[i];
+          else if (header.includes('symbol')) row.symbol = values[i];
           else if (header.includes('type')) row.type = values[i];
-          else if (header.includes('qty')) row.type = values[i];
+          else if (header.includes('qty')) row.qty = parseInt(values[i]) || 1;
           else if (header.includes('purchase')) row.purchase_value = parseFloat(values[i]) || 0;
           else if (header.includes('current')) row.current_value = parseFloat(values[i]) || 0;
         });
@@ -146,6 +187,7 @@ const InvestmentsPage = () => {
       try {
         await createInvestment({
           name: item.name,
+          symbol: item.symbol || undefined,
           type: item.type,
           qty: item.qty,
           purchase_value: item.purchase_value,
@@ -175,11 +217,11 @@ const InvestmentsPage = () => {
 
   const downloadSampleCsv = () => {
     const sampleData = [
-      'name,type,purchase_value,current_value',
-      'Apple Stock,Stock,150.00,175.50',
-      'Gold Investment,Gold,1800.00,1950.00',
-      'Tech Startup,Business,10000.00,12500.00',
-      'Bitcoin,Cryptocurrency,45000.00,42000.00'
+      'name,symbol,type,qty,purchase_value,current_value',
+      'Apple Stock,AAPL,Stock,10,150.00,175.50',
+      'Gold Investment,,Gold,5,1800.00,1950.00',
+      'Tech Startup,,Business,1,10000.00,12500.00',
+      'Bitcoin,,Cryptocurrency,0.5,45000.00,42000.00'
     ].join('\n');
 
     const blob = new Blob([sampleData], { type: 'text/csv' });
@@ -227,6 +269,8 @@ const InvestmentsPage = () => {
     return colors[type] || 'secondary';
   };
 
+  const hasStocksWithSymbols = investments.some(inv => inv.symbol && inv.type === 'Stock');
+
   useEffect(() => {
     load();
   }, []);
@@ -239,6 +283,25 @@ const InvestmentsPage = () => {
           Investments
         </h1>
         <div className="d-flex gap-2">
+          {hasStocksWithSymbols && (
+            <button
+              className="btn btn-outline-success"
+              onClick={handleRefreshPrices}
+              disabled={priceUpdateLoading}
+            >
+              {priceUpdateLoading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2"></span>
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <i className="bi bi-arrow-clockwise me-1"></i>
+                  Refresh Prices
+                </>
+              )}
+            </button>
+          )}
           <button
             className="btn btn-outline-primary"
             onClick={() => setShowBulkUpload(!showBulkUpload)}
@@ -276,7 +339,7 @@ const InvestmentsPage = () => {
               <div className="col-md-6">
                 <h6>Upload CSV File</h6>
                 <p className="text-muted small">
-                  Upload a CSV file with columns: name, type, purchase_value, current_value
+                  Upload a CSV file with columns: name, type, qty, purchase_value, current_value, symbol (optional for stocks)
                 </p>
                 <input
                   type="file"
@@ -302,6 +365,12 @@ const InvestmentsPage = () => {
                     </span>
                   ))}
                 </div>
+                <div className="mt-3">
+                  <small className="text-muted">
+                    <i className="bi bi-info-circle me-1"></i>
+                    For stocks, add a symbol column to enable automatic price updates
+                  </small>
+                </div>
               </div>
             </div>
 
@@ -313,6 +382,7 @@ const InvestmentsPage = () => {
                     <thead>
                       <tr>
                         <th>Name</th>
+                        <th>Symbol</th>
                         <th>Type</th>
                         <th>QTY</th>
                         <th>Purchase Value</th>
@@ -328,14 +398,22 @@ const InvestmentsPage = () => {
                           <tr key={index}>
                             <td>{item.name}</td>
                             <td>
+                              {item.symbol ? (
+                                <span className="badge bg-info">{item.symbol}</span>
+                              ) : (
+                                <span className="text-muted">-</span>
+                              )}
+                            </td>
+                            <td>
                               <span className={`badge bg-${getTypeColor(item.type)}`}>
                                 {item.type}
                               </span>
                             </td>
-                            <td>${item.purchase_value.toFixed(2)}</td>
-                            <td>${item.current_value.toFixed(2)}</td>
+                            <td>{item.qty}</td>
+                            <td>₹{item.purchase_value.toFixed(2)}</td>
+                            <td>₹{item.current_value.toFixed(2)}</td>
                             <td className={isProfit ? 'text-success' : 'text-danger'}>
-                              {isProfit ? '+' : ''}${gainLoss.amount.toFixed(2)}
+                              {isProfit ? '+' : ''}₹{gainLoss.amount.toFixed(2)}
                             </td>
                           </tr>
                         );
@@ -405,6 +483,25 @@ const InvestmentsPage = () => {
                   />
                 </div>
                 <div className="col-md-6 mb-3">
+                  <label htmlFor="symbol" className="form-label">
+                    Symbol 
+                    <small className="text-muted">(optional, for stocks only)</small>
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    id="symbol"
+                    value={formData.symbol}
+                    onChange={e => setFormData({ ...formData, symbol: e.target.value.toUpperCase() })}
+                    placeholder="e.g., AAPL, GOOGL, TSLA"
+                  />
+                  <small className="text-muted">
+                    Add symbol to enable automatic price updates for stocks
+                  </small>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-md-6 mb-3">
                   <label htmlFor="type" className="form-label">Investment Type</label>
                   <select
                     className="form-select"
@@ -419,12 +516,8 @@ const InvestmentsPage = () => {
                     ))}
                   </select>
                 </div>
-              </div>
-              
-                
-              <div className="row">
-              <div className="col-md-6 mb-3">
-                  <label htmlFor="qty" className="form-label">QTY</label>
+                <div className="col-md-6 mb-3">
+                  <label htmlFor="qty" className="form-label">Quantity</label>
                   <input
                     type="number"
                     step="1"
@@ -436,6 +529,8 @@ const InvestmentsPage = () => {
                     required
                   />
                 </div>
+              </div>
+              <div className="row">
                 <div className="col-md-6 mb-3">
                   <label htmlFor="purchase_value" className="form-label">Purchase Value (₹)</label>
                   <input
@@ -523,10 +618,18 @@ const InvestmentsPage = () => {
                     <div className="d-flex justify-content-between align-items-start mb-3">
                       <div>
                         <h5 className="card-title mb-1">{investment.name}</h5>
-                        <span className={`badge bg-${getTypeColor(investment.type)}`}>
-                          <i className={`${getTypeIcon(investment.type)} me-1`}></i>
-                          {investment.type}
-                        </span>
+                        <div className="d-flex gap-2 align-items-center">
+                          <span className={`badge bg-${getTypeColor(investment.type)}`}>
+                            <i className={`${getTypeIcon(investment.type)} me-1`}></i>
+                            {investment.type}
+                          </span>
+                          {investment.symbol && (
+                            <span className="badge bg-info">
+                              <i className="bi bi-graph-up me-1"></i>
+                              {investment.symbol}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <button
                         className="btn btn-outline-danger btn-sm"
@@ -539,19 +642,23 @@ const InvestmentsPage = () => {
 
                     <div className="mb-3">
                       <div className="d-flex justify-content-between mb-2">
+                        <span className="text-muted">Quantity:</span>
+                        <span className="fw-bold">{investment.qty}</span>
+                      </div>
+                      <div className="d-flex justify-content-between mb-2">
                         <span className="text-muted">Purchase Value:</span>
-                        <span className="fw-bold">${investment.purchase_value.toFixed(2)}</span>
+                        <span className="fw-bold">₹{investment.purchase_value.toFixed(2)}</span>
                       </div>
                       <div className="d-flex justify-content-between mb-2">
                         <span className="text-muted">Current Value:</span>
-                        <span className="fw-bold">${investment.current_value.toFixed(2)}</span>
+                        <span className="fw-bold">₹{investment.current_value.toFixed(2)}</span>
                       </div>
                       <hr />
                       <div className="d-flex justify-content-between">
                         <span className="text-muted">Gain/Loss:</span>
                         <div className="text-end">
                           <div className={`fw-bold ${isProfit ? 'text-success' : 'text-danger'}`}>
-                            {isProfit ? '+' : ''}${gainLoss.amount.toFixed(2)}
+                            {isProfit ? '+' : ''}₹{gainLoss.amount.toFixed(2)}
                           </div>
                           <small className={isProfit ? 'text-success' : 'text-danger'}>
                             ({isProfit ? '+' : ''}{gainLoss.percentage}%)
@@ -571,6 +678,13 @@ const InvestmentsPage = () => {
                     <small>
                       <i className="bi bi-calendar me-1"></i>
                       Added {new Date(investment.created_at).toLocaleDateString()}
+                      {investment.last_updated && (
+                        <>
+                          <br />
+                          <i className="bi bi-arrow-clockwise me-1"></i>
+                          Updated {new Date(investment.last_updated).toLocaleDateString()}
+                        </>
+                      )}
                     </small>
                   </div>
                 </div>

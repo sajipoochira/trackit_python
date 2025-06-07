@@ -1,11 +1,13 @@
 export interface Investment {
   id: number;
   name: string;
+  symbol?: string;
   type: string;
   qty: number;
   current_value: number;
   purchase_value: number;
   created_at: string;
+  last_updated?: string;
 }
 
 export interface Income {

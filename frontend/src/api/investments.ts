@@ -7,5 +7,11 @@ export const fetchInvestments = async (): Promise<Investment[]> =>
 export const createInvestment = async (data: Omit<Investment, 'id' | 'created_at'>): Promise<Investment> =>
   (await API.post('/investments/', data)).data;
 
+export const updateInvestment = async (id: number, data: Partial<Investment>): Promise<Investment> =>
+  (await API.put(`/investments/${id}/`, data)).data;
+
 export const deleteInvestment = async (id: number): Promise<void> =>
   (await API.delete(`/investments/${id}/`)).data;
+
+export const getLTP = async (symbol: string): Promise<{ symbol: string; ltp: number }> =>
+  (await API.get(`/ltp/get_ltp/?symbol=${symbol}`)).data;
