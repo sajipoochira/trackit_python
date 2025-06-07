@@ -1,7 +1,7 @@
 from rest_framework import viewsets, permissions
 from .models import Investment, Income, Expense, Asset
 from .serializers import InvestmentSerializer, IncomeSerializer, ExpenseSerializer, AssetSerializer, LTPResponseSerializer
-from ..tools.kite import get_price
+from tools.kite import get_price
 from rest_framework import status
 
 from rest_framework.response import Response
