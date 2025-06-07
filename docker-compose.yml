@@ -3,41 +3,28 @@ version: '3.9'
 services:
   web:
     build: ./backend
-    command: gunicorn trackit_backend.wsgi:application --bind 0.0.0.0:8000
+    command: sh -c "python manage.py makemigrations && python manage.py migrate && gunicorn trackit_backend.wsgi:application --bind 0.0.0.0:8000"
     volumes:
       - ./backend:/app
     ports:
       - "8000:8000"
+    env_file:
+      - ./backend/.env
     environment:
       - DEBUG=1
-      - DATABASE_URL=postgresql://trackit:trackit@db:5432/trackit
-      - DJANGO_SECRET_KEY=your-secret-key-for-development
-    depends_on:
-      - db
 
   frontend:
     build: ./frontend
-    command: sh -c "npm install && npm run dev"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     volumes:
       - ./frontend:/app
       - /app/node_modules
     ports:
       - "5173:5173"
-    environment:
-      - VITE_API_URL=http://localhost:8000
+    env_file:
+      - ./frontend/.env
     depends_on:
       - web
-
-  db:
-    image: postgres:15
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_DB=trackit
-      - POSTGRES_USER=trackit
-      - POSTGRES_PASSWORD=trackit
-    ports:
-      - "5432:5432"
 
 volumes:
   postgres_data:
