@@ -8,3 +8,4 @@ kiteconnect
 python-dotenv
 supabase
 dj-database-url
+nsetools
