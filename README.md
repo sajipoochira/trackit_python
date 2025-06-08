@@ -26,7 +26,13 @@ A full-stack personal finance tracking application built with Django REST Framew
 2. Once your project is created, go to Settings > API
 3. Copy your project URL and API keys
 
-### 2. Environment Variables
+### 2. Kite Connect Setup
+
+1. Go to [Kite Connect](https://kite.trade/) and create a developer account
+2. Create a new app to get your API key and secret
+3. Note: You'll need to complete KYC and have a Zerodha account
+
+### 3. Environment Variables
 
 Create the following environment files:
 
@@ -46,9 +52,9 @@ DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
 CORS_ALLOWED_ORIGINS=http://localhost:5173
 
-# Kite Connect API (optional, for stock price updates)
+# Kite Connect API Configuration
 API_KEY=your_kite_api_key
-ACCESS_TOKEN=your_kite_access_token
+API_SECRET=your_kite_api_secret
 ```
 
 **frontend/.env**:
@@ -61,14 +67,27 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_API_URL=http://localhost:8000
 ```
 
-### 3. Getting Supabase Database URL
+### 4. Getting Supabase Database URL
 
 1. In your Supabase dashboard, go to Settings > Database
 2. Scroll down to "Connection string" section
 3. Copy the URI and replace `[YOUR-PASSWORD]` with your actual database password
 4. Use this as your `DATABASE_URL` in the backend `.env` file
 
-### 4. Running the Application
+### 5. Getting Kite Connect API Credentials
+
+1. Go to [Kite Connect](https://developers.kite.trade/)
+2. Login with your Zerodha credentials
+3. Create a new app
+4. Copy the API Key and API Secret
+5. Add them to your `backend/.env` file
+
+**Important**: 
+- You need a valid Zerodha trading account
+- Complete KYC verification is required
+- The API credentials are for live trading, use carefully
+
+### 6. Running the Application
 
 #### Using Docker (Recommended)
 ```bash
@@ -91,18 +110,29 @@ npm install
 npm run dev
 ```
 
-### 5. Create Admin User
+### 7. Create Admin User
 
 ```bash
 cd backend
 python manage.py createsuperuser
 ```
 
-### 6. Access the Application
+### 8. Access the Application
 
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:8000
 - Django Admin: http://localhost:8000/admin
+
+## Using Kite Connect Authentication
+
+1. **Login to the app** with your admin credentials
+2. **Go to Investments page**
+3. **Click "Refresh Prices"** - this will prompt for Kite authentication
+4. **Click "Open Kite Login"** - this opens Kite in a new tab
+5. **Login with your Zerodha credentials**
+6. **Copy the request token** from the redirect URL
+7. **Paste it in the modal** and click "Complete Authentication"
+8. **Your access token is now stored** and you can refresh stock prices
 
 ## API Endpoints
 
@@ -110,7 +140,9 @@ python manage.py createsuperuser
 - `POST /api/token/refresh/` - Refresh token
 - `GET/POST /api/investments/` - List/Create investments
 - `GET/PUT/DELETE /api/investments/{id}/` - Retrieve/Update/Delete investment
-- `GET /api/ltp/get_ltp/?symbol=SYMBOL` - Get live stock price
+- `GET /api/ltp/get_ltp/?symbol=SYMBOL&access_token=TOKEN` - Get live stock price
+- `GET /api/kite/login-url/` - Get Kite login URL
+- `POST /api/kite/callback/` - Handle Kite authentication callback
 
 ## CSV Upload Format
 
@@ -135,9 +167,36 @@ Tech Startup,,Business,1,10000.00,12500.00
 - Business
 - Other
 
+## Troubleshooting
+
+### Kite API Issues
+
+1. **"Kite API credentials not configured"**:
+   - Ensure `API_KEY` and `API_SECRET` are set in `backend/.env`
+   - Restart the Django server after adding credentials
+
+2. **"Invalid API credentials"**:
+   - Verify your API key and secret from Kite Connect dashboard
+   - Ensure your Zerodha account is active and KYC is complete
+
+3. **"Access token expired"**:
+   - Kite access tokens expire daily
+   - Re-authenticate through the app to get a new token
+
+### Database Issues
+
+1. **Connection errors**:
+   - Verify your Supabase DATABASE_URL is correct
+   - Check if your Supabase project is active
+
+2. **Migration errors**:
+   - Run `python manage.py makemigrations` and `python manage.py migrate`
+   - Ensure database permissions are correct
+
 ## Notes
 
 - Stock symbols are optional but required for automatic price updates
-- The Kite Connect API integration requires valid API credentials
+- The Kite Connect API integration requires valid API credentials and active Zerodha account
 - All monetary values are in INR (Indian Rupees)
 - The application uses JWT authentication for API access
+- Kite access tokens expire daily and need re-authentication

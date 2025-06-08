@@ -6,11 +6,14 @@ from dotenv import load_dotenv
 # Build BASE_DIR (Django standard)
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load .env file globally
-load_dotenv(os.path.join(BASE_DIR, '.env'))
+# Load .env file from the backend directory
+env_path = os.path.join(BASE_DIR, '.env')
+load_dotenv(env_path)
 
-api_key = os.getenv("API_KEY")
-api_secret = os.getenv("API_SECRET")
+# Debug: Print environment loading
+print(f"Loading .env from: {env_path}")
+print(f"API_KEY loaded: {bool(os.getenv('API_KEY'))}")
+print(f"API_SECRET loaded: {bool(os.getenv('API_SECRET'))}")
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'your-secret-key-for-development')
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
@@ -82,7 +85,6 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173').split(',')
 CORS_ALLOW_CREDENTIALS = True
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
@@ -112,3 +114,10 @@ SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
 # Kite Connect Configuration
 KITE_API_KEY = os.environ.get('API_KEY')
 KITE_API_SECRET = os.environ.get('API_SECRET')
+
+# Debug logging for environment variables
+import logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+logger.debug(f"KITE_API_KEY loaded: {bool(KITE_API_KEY)}")
+logger.debug(f"KITE_API_SECRET loaded: {bool(KITE_API_SECRET)}")
