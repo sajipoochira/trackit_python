@@ -71,9 +71,9 @@ class KiteLoginURL(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        # Load environment variables explicitly
-        load_dotenv()
+        
         api_key = os.getenv("API_KEY")
+        print("APIKey Loaded:  {api_key}")
         
         logger.debug(f"API_KEY from environment: {api_key}")
         
@@ -101,9 +101,9 @@ class KiteCallback(APIView):
             return Response({'error': 'Missing request_token'}, status=status.HTTP_400_BAD_REQUEST)
         
         # Load environment variables explicitly
-        load_dotenv()
+        
         api_key = os.getenv("API_KEY")
-        api_secret = os.getenv("API_SECRET")
+        api_secret = os.getenv("API_SEC")
         
         logger.debug(f"API_KEY: {api_key}")
         logger.debug(f"API_SECRET: {'*' * len(api_secret) if api_secret else None}")
