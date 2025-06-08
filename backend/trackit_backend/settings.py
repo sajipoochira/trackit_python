@@ -10,8 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 api_key = os.getenv("API_KEY")
-api_secret=os.getenv("API_SEC")
-
+api_secret = os.getenv("API_SECRET")
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'your-secret-key-for-development')
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
@@ -109,3 +108,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
 SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY')
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
+
+# Kite Connect Configuration
+KITE_API_KEY = os.environ.get('API_KEY')
+KITE_API_SECRET = os.environ.get('API_SECRET')

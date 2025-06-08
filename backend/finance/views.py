@@ -3,16 +3,16 @@ from .models import Investment, Income, Expense, Asset
 from .serializers import InvestmentSerializer, IncomeSerializer, ExpenseSerializer, AssetSerializer, LTPResponseSerializer
 from tools.kite import get_price
 from rest_framework import status
-
 from rest_framework.response import Response
 from rest_framework.decorators import action
-
-
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from kiteconnect import KiteConnect
-from django.conf import settings
+import os
+from dotenv import load_dotenv
 
+# Load environment variables
+load_dotenv()
 
 class BaseViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
@@ -40,45 +40,61 @@ class AssetViewSet(BaseViewSet):
     serializer_class = AssetSerializer
 
 class LTPViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.IsAuthenticated]
 
     @action(detail=False, methods=['get'])
     def get_ltp(self, request):
         symbol = request.GET.get('symbol')
+        access_token = request.GET.get('access_token')
+        
         if not symbol:
             return Response({'error': 'Symbol parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not access_token:
+            return Response({'error': 'Access token is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            ltp = get_price(symbol)
+            ltp = get_price(symbol, access_token)
             response_data = {'symbol': symbol.upper(), 'ltp': ltp}
             serializer = LTPResponseSerializer(response_data)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-kite_access_token = None
-
 class KiteLoginURL(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        kite = KiteConnect(api_key=settings.api_key)
+        api_key = os.getenv("API_KEY")
+        if not api_key:
+            return Response({'error': 'Kite API key not configured'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        kite = KiteConnect(api_key=api_key)
         login_url = kite.login_url()
         return Response({'login_url': login_url})
 
 class KiteCallback(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, request):
-        request_token = request.query_params.get('request_token')
+    def post(self, request):
+        request_token = request.data.get('request_token')
         if not request_token:
-            return Response({'error': 'Missing request_token'}, status=400)
-        kite = KiteConnect(api_key=settings.api_key)
+            return Response({'error': 'Missing request_token'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        api_key = os.getenv("API_KEY")
+        api_secret = os.getenv("API_SECRET")
+        
+        if not api_key or not api_secret:
+            return Response({'error': 'Kite API credentials not configured'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        kite = KiteConnect(api_key=api_key)
         try:
-            data = kite.generate_session(request_token, api_secret=settings.api_secret)
-            global kite_access_token
-            kite_access_token = data["access_token"]
-            # Store this token securely for the user/session
-            return Response({'access_token': kite_access_token})
+            data = kite.generate_session(request_token, api_secret=api_secret)
+            access_token = data["access_token"]
+            return Response({
+                'access_token': access_token,
+                'user_id': data.get('user_id'),
+                'user_name': data.get('user_name')
+            })
         except Exception as e:
-            return Response({'error': str(e)}, status=400)
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

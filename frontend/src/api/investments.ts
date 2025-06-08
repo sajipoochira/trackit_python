@@ -1,5 +1,6 @@
 import API from './api';
 import { Investment } from '../types';
+import { getLTPWithToken } from './kite';
 
 export const fetchInvestments = async (): Promise<Investment[]> =>
   (await API.get('/investments/')).data;
@@ -13,5 +14,10 @@ export const updateInvestment = async (id: number, data: Partial<Investment>): P
 export const deleteInvestment = async (id: number): Promise<void> =>
   (await API.delete(`/investments/${id}/`)).data;
 
-export const getLTP = async (symbol: string): Promise<{ symbol: string; ltp: number }> =>
-  (await API.get(`/ltp/get_ltp/?symbol=${symbol}`)).data;
+export const getLTP = async (symbol: string): Promise<{ symbol: string; ltp: number }> => {
+  const kiteAccessToken = localStorage.getItem('kite_access_token');
+  if (!kiteAccessToken) {
+    throw new Error('Kite access token not found. Please authenticate with Kite first.');
+  }
+  return getLTPWithToken(symbol, kiteAccessToken);
+};

@@ -1,7 +1,7 @@
 from django.urls import path, include
 from django.contrib import admin
 from rest_framework.routers import DefaultRouter
-from finance.views import InvestmentViewSet, IncomeViewSet, ExpenseViewSet, AssetViewSet, LTPViewSet,KiteLoginURL,KiteCallback
+from finance.views import InvestmentViewSet, IncomeViewSet, ExpenseViewSet, AssetViewSet, LTPViewSet, KiteLoginURL, KiteCallback
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 router = DefaultRouter()
