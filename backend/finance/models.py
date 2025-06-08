@@ -6,7 +6,7 @@ class Investment(models.Model):
     name = models.CharField(max_length=255)
     symbol = models.CharField(max_length=50, blank=True, null=True)  # Stock symbol for API calls
     type = models.CharField(max_length=50)
-    qty = models.IntegerField()
+    qty = models.IntegerField(default=1)
     current_value = models.FloatField()
     purchase_value = models.FloatField()
     created_at = models.DateTimeField(auto_now_add=True)

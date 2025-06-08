@@ -138,15 +138,19 @@ const InvestmentsPage = () => {
         return;
       }
 
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-      const expectedHeaders = ['name', 'type', 'qty', 'purchase_value', 'current_value'];
+      const normalize = (h: string) => h.trim().toLowerCase().replace(/[^a-z]/g, '');
 
-      const hasAllHeaders = expectedHeaders.every(header =>
-        headers.some(h => h.includes(header.replace('_', '')))
-      );
+      const headers = lines[0].split(',').map(h => normalize(h));
+      const expectedHeaders = ['name', 'type', 'qty', 'purchasevalue', 'currentvalue'];
+      
+      const hasAllHeaders = expectedHeaders.every(h => headers.includes(h));
+      
+
+        
+    
 
       if (!hasAllHeaders) {
-        setError('CSV must have columns: name, type, qty, purchase_value, current_value (symbol is optional)');
+        setError('CSV must have columns: name, type, qty, purchase_value, current_value (symbol is optional)'+ headers);
         return;
       }
 

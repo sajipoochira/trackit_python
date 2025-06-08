@@ -1,9 +1,17 @@
 import os
 from datetime import timedelta
+from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Build BASE_DIR (Django standard)
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load .env file globally
+load_dotenv(os.path.join(BASE_DIR, '.env'))
+
+api_key = os.getenv("API_KEY")
+api_secret=os.getenv("API_SEC")
+
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'your-secret-key-for-development')
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
