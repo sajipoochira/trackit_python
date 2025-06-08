@@ -18,6 +18,7 @@ backend/.env.*
 # IDE + OS
 .idea/
 .vscode/
+.idx/
 *.swp
 *.swo
 .DS_Store
