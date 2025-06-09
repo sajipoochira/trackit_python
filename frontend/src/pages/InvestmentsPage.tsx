@@ -13,7 +13,8 @@ const InvestmentsPage = () => {
   const [csvPreview, setCsvPreview] = useState<any[]>([]);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [priceUpdateLoading, setPriceUpdateLoading] = useState(false);
-  const [viewMode, setViewMode] = useState<'tiles' | 'list'>('tiles');
+  const [viewMode, setViewMode] = useState<'consolidated' | 'tiles' | 'list'>('consolidated');
+  const [selectedType, setSelectedType] = useState<string | null>(null);
   const [editingInvestment, setEditingInvestment] = useState<number | null>(null);
   const [editFormData, setEditFormData] = useState({
     qty: '',
@@ -323,9 +324,142 @@ const InvestmentsPage = () => {
 
   const hasStocksWithSymbols = investments.some(inv => inv.symbol && inv.type === 'Stock');
 
+  // Group investments by type for consolidated view
+  const getConsolidatedData = () => {
+    const grouped = investments.reduce((acc, investment) => {
+      const type = investment.type;
+      if (!acc[type]) {
+        acc[type] = {
+          type,
+          count: 0,
+          totalInvested: 0,
+          totalCurrent: 0,
+          investments: []
+        };
+      }
+      
+      const investedValue = investment.qty * investment.purchase_value;
+      const currentValue = investment.qty * investment.current_value;
+      
+      acc[type].count += 1;
+      acc[type].totalInvested += investedValue;
+      acc[type].totalCurrent += currentValue;
+      acc[type].investments.push(investment);
+      
+      return acc;
+    }, {} as Record<string, any>);
+
+    return Object.values(grouped);
+  };
+
+  const handleTypeClick = (type: string) => {
+    if (selectedType === type) {
+      setSelectedType(null);
+      setViewMode('consolidated');
+    } else {
+      setSelectedType(type);
+      setViewMode('tiles');
+    }
+  };
+
+  const handleBackToConsolidated = () => {
+    setSelectedType(null);
+    setViewMode('consolidated');
+  };
+
+  const getFilteredInvestments = () => {
+    if (selectedType) {
+      return investments.filter(inv => inv.type === selectedType);
+    }
+    return investments;
+  };
+
+  const renderConsolidatedView = () => {
+    const consolidatedData = getConsolidatedData();
+
+    return (
+      <div className="row">
+        {consolidatedData.map((typeData) => {
+          const gainLoss = typeData.totalCurrent - typeData.totalInvested;
+          const gainLossPercentage = ((gainLoss / typeData.totalInvested) * 100).toFixed(2);
+          const isProfit = gainLoss >= 0;
+
+          return (
+            <div key={typeData.type} className="col-md-6 col-lg-4 mb-4">
+              <div 
+                className="card h-100 shadow-sm cursor-pointer hover-shadow"
+                onClick={() => handleTypeClick(typeData.type)}
+                style={{ cursor: 'pointer', transition: 'all 0.2s ease' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '';
+                }}
+              >
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                      <h5 className="card-title mb-1">
+                        <i className={`${getTypeIcon(typeData.type)} me-2 text-${getTypeColor(typeData.type)}`}></i>
+                        {typeData.type}
+                      </h5>
+                      <span className={`badge bg-${getTypeColor(typeData.type)}`}>
+                        {typeData.count} investment{typeData.count !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <i className="bi bi-chevron-right text-muted"></i>
+                  </div>
+
+                  <div className="mb-3">
+                    <div className="d-flex justify-content-between mb-2">
+                      <span className="text-muted">Total Invested:</span>
+                      <span className="fw-bold text-info">₹{typeData.totalInvested.toFixed(2)}</span>
+                    </div>
+                    <div className="d-flex justify-content-between mb-2">
+                      <span className="text-muted">Current Value:</span>
+                      <span className="fw-bold text-primary">₹{typeData.totalCurrent.toFixed(2)}</span>
+                    </div>
+                    <hr />
+                    <div className="d-flex justify-content-between">
+                      <span className="text-muted">Total Gain/Loss:</span>
+                      <div className="text-end">
+                        <div className={`fw-bold ${isProfit ? 'text-success' : 'text-danger'}`}>
+                          {isProfit ? '+' : ''}₹{gainLoss.toFixed(2)}
+                        </div>
+                        <small className={isProfit ? 'text-success' : 'text-danger'}>
+                          ({isProfit ? '+' : ''}{gainLossPercentage}%)
+                        </small>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="progress" style={{ height: '6px' }}>
+                    <div
+                      className={`progress-bar ${isProfit ? 'bg-success' : 'bg-danger'}`}
+                      style={{ width: `${Math.min(Math.abs(parseFloat(gainLossPercentage)), 100)}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div className="card-footer text-muted">
+                  <small>
+                    <i className="bi bi-eye me-1"></i>
+                    Click to view details
+                  </small>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const renderTileView = () => (
     <div className="row">
-      {investments.map((investment) => {
+      {getFilteredInvestments().map((investment) => {
         const gainLoss = calculateGainLoss(investment.current_value, investment.purchase_value);
         const isProfit = gainLoss.amount >= 0;
         const investedValue = investment.qty * investment.purchase_value;
@@ -494,7 +628,7 @@ const InvestmentsPage = () => {
               </tr>
             </thead>
             <tbody>
-              {investments.map((investment) => {
+              {getFilteredInvestments().map((investment) => {
                 const investedValue = investment.qty * investment.purchase_value;
                 const currentTotalValue = investment.qty * investment.current_value;
                 const totalGainLoss = currentTotalValue - investedValue;
@@ -620,42 +754,55 @@ const InvestmentsPage = () => {
   return (
     <Layout>
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h1 className="h2 mb-0">
-          <i className="bi bi-graph-up me-2 text-primary"></i>
-          Investments
-        </h1>
+        <div className="d-flex align-items-center">
+          {selectedType && (
+            <button
+              className="btn btn-outline-secondary me-3"
+              onClick={handleBackToConsolidated}
+            >
+              <i className="bi bi-arrow-left me-1"></i>
+              Back
+            </button>
+          )}
+          <h1 className="h2 mb-0">
+            <i className="bi bi-graph-up me-2 text-primary"></i>
+            {selectedType ? `${selectedType} Investments` : 'Investments'}
+          </h1>
+        </div>
         <div className="d-flex gap-2 align-items-center">
-          {/* View Toggle Switch */}
-          <div className="d-flex align-items-center me-3">
-            <span className="me-2 text-muted small">View:</span>
-            <div className="btn-group" role="group">
-              <input
-                type="radio"
-                className="btn-check"
-                name="viewMode"
-                id="tilesView"
-                checked={viewMode === 'tiles'}
-                onChange={() => setViewMode('tiles')}
-              />
-              <label className="btn btn-outline-secondary btn-sm" htmlFor="tilesView">
-                <i className="bi bi-grid-3x3-gap me-1"></i>
-                Tiles
-              </label>
+          {/* View Toggle Switch - only show when not in consolidated view */}
+          {viewMode !== 'consolidated' && (
+            <div className="d-flex align-items-center me-3">
+              <span className="me-2 text-muted small">View:</span>
+              <div className="btn-group" role="group">
+                <input
+                  type="radio"
+                  className="btn-check"
+                  name="viewMode"
+                  id="tilesView"
+                  checked={viewMode === 'tiles'}
+                  onChange={() => setViewMode('tiles')}
+                />
+                <label className="btn btn-outline-secondary btn-sm" htmlFor="tilesView">
+                  <i className="bi bi-grid-3x3-gap me-1"></i>
+                  Tiles
+                </label>
 
-              <input
-                type="radio"
-                className="btn-check"
-                name="viewMode"
-                id="listView"
-                checked={viewMode === 'list'}
-                onChange={() => setViewMode('list')}
-              />
-              <label className="btn btn-outline-secondary btn-sm" htmlFor="listView">
-                <i className="bi bi-list-ul me-1"></i>
-                List
-              </label>
+                <input
+                  type="radio"
+                  className="btn-check"
+                  name="viewMode"
+                  id="listView"
+                  checked={viewMode === 'list'}
+                  onChange={() => setViewMode('list')}
+                />
+                <label className="btn btn-outline-secondary btn-sm" htmlFor="listView">
+                  <i className="bi bi-list-ul me-1"></i>
+                  List
+                </label>
+              </div>
             </div>
-          </div>
+          )}
 
           {hasStocksWithSymbols && (
             <button
@@ -989,7 +1136,7 @@ const InvestmentsPage = () => {
                   <div className="d-flex justify-content-between">
                     <div>
                       <h6 className="card-title">Total Investments</h6>
-                      <h4 className="mb-0">{investments.length}</h4>
+                      <h4 className="mb-0">{selectedType ? getFilteredInvestments().length : investments.length}</h4>
                     </div>
                     <i className="bi bi-graph-up" style={{ fontSize: '2rem', opacity: 0.7 }}></i>
                   </div>
@@ -1002,7 +1149,7 @@ const InvestmentsPage = () => {
                   <div className="d-flex justify-content-between">
                     <div>
                       <h6 className="card-title">Total Value</h6>
-                      <h4 className="mb-0">₹{investments.reduce((sum, inv) => sum + (inv.qty * inv.current_value), 0).toFixed(2)}</h4>
+                      <h4 className="mb-0">₹{getFilteredInvestments().reduce((sum, inv) => sum + (inv.qty * inv.current_value), 0).toFixed(2)}</h4>
                     </div>
                     <i className="bi bi-currency-rupee" style={{ fontSize: '2rem', opacity: 0.7 }}></i>
                   </div>
@@ -1015,7 +1162,7 @@ const InvestmentsPage = () => {
                   <div className="d-flex justify-content-between">
                     <div>
                       <h6 className="card-title">Total Invested</h6>
-                      <h4 className="mb-0">₹{investments.reduce((sum, inv) => sum + (inv.qty * inv.purchase_value), 0).toFixed(2)}</h4>
+                      <h4 className="mb-0">₹{getFilteredInvestments().reduce((sum, inv) => sum + (inv.qty * inv.purchase_value), 0).toFixed(2)}</h4>
                     </div>
                     <i className="bi bi-wallet2" style={{ fontSize: '2rem', opacity: 0.7 }}></i>
                   </div>
@@ -1024,7 +1171,7 @@ const InvestmentsPage = () => {
             </div>
             <div className="col-md-3">
               <div className={`card text-white ${
-                investments.reduce((sum, inv) => sum + ((inv.qty * inv.current_value) - (inv.qty * inv.purchase_value)), 0) >= 0 
+                getFilteredInvestments().reduce((sum, inv) => sum + ((inv.qty * inv.current_value) - (inv.qty * inv.purchase_value)), 0) >= 0 
                   ? 'bg-success' 
                   : 'bg-danger'
               }`}>
@@ -1033,12 +1180,12 @@ const InvestmentsPage = () => {
                     <div>
                       <h6 className="card-title">Total Gain/Loss</h6>
                       <h4 className="mb-0">
-                        {investments.reduce((sum, inv) => sum + ((inv.qty * inv.current_value) - (inv.qty * inv.purchase_value)), 0) >= 0 ? '+' : ''}
-                        ₹{investments.reduce((sum, inv) => sum + ((inv.qty * inv.current_value) - (inv.qty * inv.purchase_value)), 0).toFixed(2)}
+                        {getFilteredInvestments().reduce((sum, inv) => sum + ((inv.qty * inv.current_value) - (inv.qty * inv.purchase_value)), 0) >= 0 ? '+' : ''}
+                        ₹{getFilteredInvestments().reduce((sum, inv) => sum + ((inv.qty * inv.current_value) - (inv.qty * inv.purchase_value)), 0).toFixed(2)}
                       </h4>
                     </div>
                     <i className={`bi ${
-                      investments.reduce((sum, inv) => sum + ((inv.qty * inv.current_value) - (inv.qty * inv.purchase_value)), 0) >= 0 
+                      getFilteredInvestments().reduce((sum, inv) => sum + ((inv.qty * inv.current_value) - (inv.qty * inv.purchase_value)), 0) >= 0 
                         ? 'bi-trending-up' 
                         : 'bi-trending-down'
                     }`} style={{ fontSize: '2rem', opacity: 0.7 }}></i>
@@ -1049,7 +1196,8 @@ const InvestmentsPage = () => {
           </div>
 
           {/* Investments Display */}
-          {viewMode === 'tiles' ? renderTileView() : renderListView()}
+          {viewMode === 'consolidated' ? renderConsolidatedView() : 
+           viewMode === 'tiles' ? renderTileView() : renderListView()}
         </>
       )}
     </Layout>
