@@ -83,6 +83,38 @@ export interface Asset {
   purchase_date?: string;
   notes?: string;
   created_at: string;
+  // Bank account specific fields
+  account_number?: string;
+  bank_name?: string;
+  account_type?: string;
+}
+
+export interface Liability {
+  id: number;
+  name: string;
+  type: string;
+  type_display: string;
+  principal_amount: number;
+  current_balance: number;
+  currency: string;
+  currency_display: string;
+  interest_rate?: number;
+  monthly_payment?: number;
+  start_date: string;
+  due_date?: string;
+  next_payment_date?: string;
+  status: string;
+  status_display: string;
+  lender_name?: string;
+  notes?: string;
+  principal_amount_in_inr: number;
+  current_balance_in_inr: number;
+  monthly_payment_in_inr: number;
+  paid_amount: number;
+  paid_amount_in_inr: number;
+  completion_percentage: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ExchangeRate {

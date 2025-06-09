@@ -1,8 +1,8 @@
 from rest_framework import viewsets, permissions, status
-from .models import Investment, Income, Expense, Asset, ExchangeRate, Budget
+from .models import Investment, Income, Expense, Asset, ExchangeRate, Budget, Liability
 from .serializers import (
     InvestmentSerializer, IncomeSerializer, ExpenseSerializer, 
-    AssetSerializer, ExchangeRateSerializer, LTPResponseSerializer, BudgetSerializer
+    AssetSerializer, ExchangeRateSerializer, LTPResponseSerializer, BudgetSerializer, LiabilitySerializer
 )
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -400,6 +400,101 @@ class AssetViewSet(BaseViewSet):
             'total_value_inr': sum(asset.get_value_in_inr() for asset in assets),
             'total_count': assets.count()
         })
+
+class LiabilityViewSet(BaseViewSet):
+    queryset = Liability.objects.all()
+    serializer_class = LiabilitySerializer
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        status_filter = self.request.query_params.get('status', None)
+        liability_type = self.request.query_params.get('type', None)
+        
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        if liability_type:
+            queryset = queryset.filter(type=liability_type)
+            
+        return queryset.order_by('-created_at')
+    
+    @action(detail=False, methods=['get'])
+    def types(self, request):
+        """Get all liability types"""
+        return Response(Liability.LIABILITY_TYPES)
+    
+    @action(detail=False, methods=['get'])
+    def statuses(self, request):
+        """Get all liability statuses"""
+        return Response(Liability.STATUS_CHOICES)
+    
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """Get liability summary by type and status"""
+        liabilities = self.get_queryset()
+        
+        # Summary by type
+        type_summary = {}
+        for liability in liabilities:
+            liability_type = liability.get_type_display()
+            if liability_type not in type_summary:
+                type_summary[liability_type] = {
+                    'total_principal': 0,
+                    'total_principal_inr': 0,
+                    'total_balance': 0,
+                    'total_balance_inr': 0,
+                    'count': 0,
+                    'currencies': {}
+                }
+            
+            type_summary[liability_type]['total_principal'] += liability.principal_amount
+            type_summary[liability_type]['total_principal_inr'] += liability.get_principal_amount_in_inr()
+            type_summary[liability_type]['total_balance'] += liability.current_balance
+            type_summary[liability_type]['total_balance_inr'] += liability.get_current_balance_in_inr()
+            type_summary[liability_type]['count'] += 1
+            
+            if liability.currency not in type_summary[liability_type]['currencies']:
+                type_summary[liability_type]['currencies'][liability.currency] = 0
+            type_summary[liability_type]['currencies'][liability.currency] += liability.current_balance
+        
+        # Summary by status
+        status_summary = {}
+        for liability in liabilities:
+            status = liability.get_status_display()
+            if status not in status_summary:
+                status_summary[status] = {
+                    'total_balance': 0,
+                    'total_balance_inr': 0,
+                    'count': 0
+                }
+            status_summary[status]['total_balance'] += liability.current_balance
+            status_summary[status]['total_balance_inr'] += liability.get_current_balance_in_inr()
+            status_summary[status]['count'] += 1
+        
+        return Response({
+            'type_summary': type_summary,
+            'status_summary': status_summary,
+            'total_principal_inr': sum(liability.get_principal_amount_in_inr() for liability in liabilities),
+            'total_balance_inr': sum(liability.get_current_balance_in_inr() for liability in liabilities),
+            'total_monthly_payment_inr': sum(liability.get_monthly_payment_in_inr() for liability in liabilities),
+            'total_count': liabilities.count()
+        })
+    
+    @action(detail=False, methods=['get'])
+    def upcoming_payments(self, request):
+        """Get upcoming payments in next 30 days"""
+        from datetime import date, timedelta
+        
+        today = date.today()
+        next_month = today + timedelta(days=30)
+        
+        upcoming = self.get_queryset().filter(
+            status='active',
+            next_payment_date__gte=today,
+            next_payment_date__lte=next_month
+        ).order_by('next_payment_date')
+        
+        serializer = self.get_serializer(upcoming, many=True)
+        return Response(serializer.data)
 
 class ExchangeRateViewSet(viewsets.ModelViewSet):
     queryset = ExchangeRate.objects.all()

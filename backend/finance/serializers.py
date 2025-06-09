@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Investment, Income, Expense, Asset, ExchangeRate, Budget
+from .models import Investment, Income, Expense, Asset, ExchangeRate, Budget, Liability
 
 class InvestmentSerializer(serializers.ModelSerializer):
     amount_in_inr = serializers.SerializerMethodField()
@@ -103,6 +103,40 @@ class AssetSerializer(serializers.ModelSerializer):
     
     def get_value_in_inr(self, obj):
         return obj.get_value_in_inr()
+
+class LiabilitySerializer(serializers.ModelSerializer):
+    principal_amount_in_inr = serializers.SerializerMethodField()
+    current_balance_in_inr = serializers.SerializerMethodField()
+    monthly_payment_in_inr = serializers.SerializerMethodField()
+    paid_amount = serializers.SerializerMethodField()
+    paid_amount_in_inr = serializers.SerializerMethodField()
+    completion_percentage = serializers.SerializerMethodField()
+    type_display = serializers.CharField(source='get_type_display', read_only=True)
+    currency_display = serializers.CharField(source='get_currency_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
+    class Meta:
+        model = Liability
+        fields = '__all__'
+        read_only_fields = ['user', 'created_at', 'updated_at']
+    
+    def get_principal_amount_in_inr(self, obj):
+        return obj.get_principal_amount_in_inr()
+    
+    def get_current_balance_in_inr(self, obj):
+        return obj.get_current_balance_in_inr()
+    
+    def get_monthly_payment_in_inr(self, obj):
+        return obj.get_monthly_payment_in_inr()
+    
+    def get_paid_amount(self, obj):
+        return obj.get_paid_amount()
+    
+    def get_paid_amount_in_inr(self, obj):
+        return obj.get_paid_amount_in_inr()
+    
+    def get_completion_percentage(self, obj):
+        return obj.get_completion_percentage()
 
 class ExchangeRateSerializer(serializers.ModelSerializer):
     class Meta:
