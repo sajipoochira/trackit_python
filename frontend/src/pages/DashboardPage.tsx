@@ -195,7 +195,7 @@ const DashboardPage = () => {
     return (
       <Layout>
         <div className="text-center py-5">
-          <div className="spinner-border text-primary" role="status">
+          <div className="spinner-border text-primary\" role="status">
             <span className="visually-hidden">Loading...</span>
           </div>
           <p className="mt-2 text-muted">Loading dashboard...</p>
