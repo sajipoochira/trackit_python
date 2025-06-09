@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 class ExchangeRate(models.Model):
     from_currency = models.CharField(max_length=10)
@@ -141,7 +142,7 @@ class Asset(models.Model):
     currency = models.CharField(max_length=10, choices=CURRENCY_CHOICES, default='INR')
     purchase_date = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
     
     def get_value_in_inr(self):
         """Convert value to INR using exchange rate"""
