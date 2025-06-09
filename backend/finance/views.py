@@ -58,6 +58,7 @@ class LTPViewSet(viewsets.ViewSet):
                 return Response({'error': f'Stock data not found for symbol: {symbol}'}, status=status.HTTP_404_NOT_FOUND)
             
             ltp = stock_data.get('lastPrice')
+            print("LTP fro the Stock {symbol} : {ltp}")
             if ltp is None:
                 return Response({'error': f'Last price not available for symbol: {symbol}'}, status=status.HTTP_404_NOT_FOUND)
             
