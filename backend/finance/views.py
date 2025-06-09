@@ -357,6 +357,49 @@ class AssetViewSet(BaseViewSet):
     def types(self, request):
         """Get all asset types"""
         return Response(Asset.ASSET_TYPES)
+    
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """Get asset summary by type and currency"""
+        assets = self.get_queryset()
+        
+        # Summary by type
+        type_summary = {}
+        for asset in assets:
+            asset_type = asset.get_type_display()
+            if asset_type not in type_summary:
+                type_summary[asset_type] = {
+                    'total_value': 0,
+                    'total_value_inr': 0,
+                    'count': 0,
+                    'currencies': {}
+                }
+            
+            type_summary[asset_type]['total_value'] += asset.value
+            type_summary[asset_type]['total_value_inr'] += asset.get_value_in_inr()
+            type_summary[asset_type]['count'] += 1
+            
+            if asset.currency not in type_summary[asset_type]['currencies']:
+                type_summary[asset_type]['currencies'][asset.currency] = 0
+            type_summary[asset_type]['currencies'][asset.currency] += asset.value
+        
+        # Summary by currency
+        currency_summary = {}
+        for asset in assets:
+            if asset.currency not in currency_summary:
+                currency_summary[asset.currency] = {
+                    'total_value': 0,
+                    'count': 0
+                }
+            currency_summary[asset.currency]['total_value'] += asset.value
+            currency_summary[asset.currency]['count'] += 1
+        
+        return Response({
+            'type_summary': type_summary,
+            'currency_summary': currency_summary,
+            'total_value_inr': sum(asset.get_value_in_inr() for asset in assets),
+            'total_count': assets.count()
+        })
 
 class ExchangeRateViewSet(viewsets.ModelViewSet):
     queryset = ExchangeRate.objects.all()
