@@ -6,9 +6,9 @@ class AddInvestmentForm extends StatefulWidget {
   final Function(Investment) onSubmit;
 
   const AddInvestmentForm({
-    Key? key,
+    super.key,
     required this.onSubmit,
-  }) : super(key: key);
+  });
 
   @override
   State<AddInvestmentForm> createState() => _AddInvestmentFormState();

@@ -15,7 +15,7 @@ import '../../widgets/dashboard/recent_transactions.dart';
 import '../../widgets/dashboard/budget_alerts.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({Key? key}) : super(key: key);
+  const DashboardScreen({super.key});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();

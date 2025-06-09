@@ -1,26 +1,78 @@
+# ====================
 # React frontend
+# ====================
 /frontend/node_modules/
-frontend/dist/
-frontend/.vite/
-frontend/.env
-frontend/.env.*
+/frontend/dist/
+/frontend/.vite/
+/frontend/.env
+/frontend/.env.*
 
+# ====================
 # Django backend
+# ====================
 /backend/__pycache__/
-backend/*.py[cod]
-backend/db.sqlite3
-backend/*.log
-backend/**/migrations/*.py
-!backend/**/migrations/__init__.py
-backend/.env
-backend/.env.*
+/backend/*.py[cod]
+/backend/db.sqlite3
+/backend/*.log
+/backend/**/migrations/*.py
+!/backend/**/migrations/__init__.py
+/backend/.env
+/backend/.env.*
 
-# IDE + OS
-.idea/
-.vscode/
-.idx/
+# ====================
+# Flutter mobile app
+# ====================
+/mobile_app/.dart_tool/
+/mobile_app/.idea/
+/mobile_app/.vscode/
+/mobile_app/build/
+/mobile_app/.packages
+/mobile_app/.flutter-plugins
+/mobile_app/.flutter-plugins-dependencies
+/mobile_app/.metadata
+/mobile_app/pubspec.lock
+/mobile_app/coverage/
+
+/mobile_app/doc/api/
+/mobile_app/ios/Flutter/.last_build_id
+/mobile_app/.pub-cache/
+/mobile_app/.pub/
+/mobile_app/android/app/debug/
+/mobile_app/android/app/profile/
+/mobile_app/android/app/release/
+/mobile_app/migrate_working_dir/
+
+/mobile_app/app.*.symbols
+/mobile_app/app.*.map.json
+
+# ====================
+# Miscellaneous (applies globally)
+# ====================
+*.class
+*.log
+*.pyc
 *.swp
-*.swo
 .DS_Store
-Thumbs.db
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+
+# ====================
+# IntelliJ related (applies globally)
+# ====================
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# ====================
+# VS Code (optional)
+/.vscode/  # uncomment if you want to ignore vscode configs globally
+
+# ====================
+# Generic environment files
+# ====================
 .env
