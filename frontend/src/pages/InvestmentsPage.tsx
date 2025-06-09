@@ -14,6 +14,11 @@ const InvestmentsPage = () => {
   const [uploadLoading, setUploadLoading] = useState(false);
   const [priceUpdateLoading, setPriceUpdateLoading] = useState(false);
   const [viewMode, setViewMode] = useState<'tiles' | 'list'>('tiles');
+  const [editingInvestment, setEditingInvestment] = useState<number | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    qty: '',
+    purchase_value: '',
+  });
   const [formData, setFormData] = useState({
     name: '',
     symbol: '',
@@ -80,6 +85,49 @@ const InvestmentsPage = () => {
         console.error(err);
         setError('Failed to delete investment');
       }
+    }
+  };
+
+  const handleEditStart = (investment: Investment) => {
+    setEditingInvestment(investment.id);
+    setEditFormData({
+      qty: investment.qty.toString(),
+      purchase_value: investment.purchase_value.toString(),
+    });
+  };
+
+  const handleEditCancel = () => {
+    setEditingInvestment(null);
+    setEditFormData({ qty: '', purchase_value: '' });
+  };
+
+  const handleEditSave = async (investmentId: number) => {
+    try {
+      const qty = parseInt(editFormData.qty);
+      const purchaseValue = parseFloat(editFormData.purchase_value);
+      
+      if (isNaN(qty) || qty <= 0) {
+        setError('Quantity must be a positive number');
+        return;
+      }
+      
+      if (isNaN(purchaseValue) || purchaseValue <= 0) {
+        setError('Purchase value must be a positive number');
+        return;
+      }
+
+      await updateInvestment(investmentId, {
+        qty: qty,
+        purchase_value: purchaseValue,
+      });
+      
+      setEditingInvestment(null);
+      setEditFormData({ qty: '', purchase_value: '' });
+      setError(null);
+      load();
+    } catch (err: any) {
+      console.error(err);
+      setError('Failed to update investment');
     }
   };
 
@@ -280,6 +328,8 @@ const InvestmentsPage = () => {
       {investments.map((investment) => {
         const gainLoss = calculateGainLoss(investment.current_value, investment.purchase_value);
         const isProfit = gainLoss.amount >= 0;
+        const investedValue = investment.qty * investment.purchase_value;
+        const currentTotalValue = investment.qty * investment.current_value;
 
         return (
           <div key={investment.id} className="col-md-6 col-lg-4 mb-4">
@@ -301,41 +351,100 @@ const InvestmentsPage = () => {
                       )}
                     </div>
                   </div>
-                  <button
-                    className="btn btn-outline-danger btn-sm"
-                    onClick={() => handleDelete(investment.id)}
-                    title="Delete investment"
-                  >
-                    <i className="bi bi-trash"></i>
-                  </button>
+                  <div className="d-flex gap-1">
+                    <button
+                      className="btn btn-outline-primary btn-sm"
+                      onClick={() => handleEditStart(investment)}
+                      title="Edit investment"
+                    >
+                      <i className="bi bi-pencil"></i>
+                    </button>
+                    <button
+                      className="btn btn-outline-danger btn-sm"
+                      onClick={() => handleDelete(investment.id)}
+                      title="Delete investment"
+                    >
+                      <i className="bi bi-trash"></i>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="mb-3">
-                  <div className="d-flex justify-content-between mb-2">
-                    <span className="text-muted">Quantity:</span>
-                    <span className="fw-bold">{investment.qty}</span>
-                  </div>
-                  <div className="d-flex justify-content-between mb-2">
-                    <span className="text-muted">Purchase Value:</span>
-                    <span className="fw-bold">₹{investment.purchase_value.toFixed(2)}</span>
-                  </div>
-                  <div className="d-flex justify-content-between mb-2">
-                    <span className="text-muted">Current Value:</span>
-                    <span className="fw-bold">₹{investment.current_value.toFixed(2)}</span>
-                  </div>
-                  <hr />
-                  <div className="d-flex justify-content-between">
-                    <span className="text-muted">Gain/Loss:</span>
-                    <div className="text-end">
-                      <div className={`fw-bold ${isProfit ? 'text-success' : 'text-danger'}`}>
-                        {isProfit ? '+' : ''}₹{gainLoss.amount.toFixed(2)}
-                      </div>
-                      <small className={isProfit ? 'text-success' : 'text-danger'}>
-                        ({isProfit ? '+' : ''}{gainLoss.percentage}%)
-                      </small>
+                {editingInvestment === investment.id ? (
+                  <div className="mb-3">
+                    <div className="mb-2">
+                      <label className="form-label small">Quantity</label>
+                      <input
+                        type="number"
+                        className="form-control form-control-sm"
+                        value={editFormData.qty}
+                        onChange={(e) => setEditFormData({ ...editFormData, qty: e.target.value })}
+                        min="1"
+                        step="1"
+                      />
+                    </div>
+                    <div className="mb-2">
+                      <label className="form-label small">Purchase Value per unit (₹)</label>
+                      <input
+                        type="number"
+                        className="form-control form-control-sm"
+                        value={editFormData.purchase_value}
+                        onChange={(e) => setEditFormData({ ...editFormData, purchase_value: e.target.value })}
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                    <div className="d-flex gap-1">
+                      <button
+                        className="btn btn-success btn-sm"
+                        onClick={() => handleEditSave(investment.id)}
+                      >
+                        <i className="bi bi-check"></i>
+                      </button>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={handleEditCancel}
+                      >
+                        <i className="bi bi-x"></i>
+                      </button>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="mb-3">
+                    <div className="d-flex justify-content-between mb-2">
+                      <span className="text-muted">Quantity:</span>
+                      <span className="fw-bold">{investment.qty}</span>
+                    </div>
+                    <div className="d-flex justify-content-between mb-2">
+                      <span className="text-muted">Purchase Value (per unit):</span>
+                      <span className="fw-bold">₹{investment.purchase_value.toFixed(2)}</span>
+                    </div>
+                    <div className="d-flex justify-content-between mb-2">
+                      <span className="text-muted">Current Value (per unit):</span>
+                      <span className="fw-bold">₹{investment.current_value.toFixed(2)}</span>
+                    </div>
+                    <hr />
+                    <div className="d-flex justify-content-between mb-2">
+                      <span className="text-muted">Total Invested:</span>
+                      <span className="fw-bold text-info">₹{investedValue.toFixed(2)}</span>
+                    </div>
+                    <div className="d-flex justify-content-between mb-2">
+                      <span className="text-muted">Total Current Value:</span>
+                      <span className="fw-bold text-primary">₹{currentTotalValue.toFixed(2)}</span>
+                    </div>
+                    <hr />
+                    <div className="d-flex justify-content-between">
+                      <span className="text-muted">Total Gain/Loss:</span>
+                      <div className="text-end">
+                        <div className={`fw-bold ${isProfit ? 'text-success' : 'text-danger'}`}>
+                          {isProfit ? '+' : ''}₹{(currentTotalValue - investedValue).toFixed(2)}
+                        </div>
+                        <small className={isProfit ? 'text-success' : 'text-danger'}>
+                          ({isProfit ? '+' : ''}{(((currentTotalValue - investedValue) / investedValue) * 100).toFixed(2)}%)
+                        </small>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="progress" style={{ height: '6px' }}>
                   <div
@@ -375,17 +484,22 @@ const InvestmentsPage = () => {
                 <th>Type</th>
                 <th>Symbol</th>
                 <th className="text-end">Qty</th>
-                <th className="text-end">Purchase Value</th>
-                <th className="text-end">Current Value</th>
-                <th className="text-end">Gain/Loss</th>
+                <th className="text-end">Purchase Value<br /><small className="text-muted">(per unit)</small></th>
+                <th className="text-end">Current Value<br /><small className="text-muted">(per unit)</small></th>
+                <th className="text-end">Total Invested<br /><small className="text-muted">(qty × purchase)</small></th>
+                <th className="text-end">Total Current<br /><small className="text-muted">(qty × current)</small></th>
+                <th className="text-end">Total Gain/Loss</th>
                 <th className="text-end">%</th>
                 <th className="text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {investments.map((investment) => {
-                const gainLoss = calculateGainLoss(investment.current_value, investment.purchase_value);
-                const isProfit = gainLoss.amount >= 0;
+                const investedValue = investment.qty * investment.purchase_value;
+                const currentTotalValue = investment.qty * investment.current_value;
+                const totalGainLoss = currentTotalValue - investedValue;
+                const totalGainLossPercentage = ((totalGainLoss / investedValue) * 100).toFixed(2);
+                const isProfit = totalGainLoss >= 0;
 
                 return (
                   <tr key={investment.id}>
@@ -413,23 +527,81 @@ const InvestmentsPage = () => {
                         <span className="text-muted">-</span>
                       )}
                     </td>
-                    <td className="text-end fw-semibold">{investment.qty}</td>
-                    <td className="text-end">₹{investment.purchase_value.toFixed(2)}</td>
-                    <td className="text-end fw-semibold">₹{investment.current_value.toFixed(2)}</td>
+                    <td className="text-end">
+                      {editingInvestment === investment.id ? (
+                        <input
+                          type="number"
+                          className="form-control form-control-sm"
+                          style={{ width: '80px' }}
+                          value={editFormData.qty}
+                          onChange={(e) => setEditFormData({ ...editFormData, qty: e.target.value })}
+                          min="1"
+                          step="1"
+                        />
+                      ) : (
+                        <span className="fw-semibold">{investment.qty}</span>
+                      )}
+                    </td>
+                    <td className="text-end">
+                      {editingInvestment === investment.id ? (
+                        <input
+                          type="number"
+                          className="form-control form-control-sm"
+                          style={{ width: '100px' }}
+                          value={editFormData.purchase_value}
+                          onChange={(e) => setEditFormData({ ...editFormData, purchase_value: e.target.value })}
+                          min="0"
+                          step="0.01"
+                        />
+                      ) : (
+                        <span>₹{investment.purchase_value.toFixed(2)}</span>
+                      )}
+                    </td>
+                    <td className="text-end">₹{investment.current_value.toFixed(2)}</td>
+                    <td className="text-end fw-semibold text-info">₹{investedValue.toFixed(2)}</td>
+                    <td className="text-end fw-semibold text-primary">₹{currentTotalValue.toFixed(2)}</td>
                     <td className={`text-end fw-semibold ${isProfit ? 'text-success' : 'text-danger'}`}>
-                      {isProfit ? '+' : ''}₹{gainLoss.amount.toFixed(2)}
+                      {isProfit ? '+' : ''}₹{totalGainLoss.toFixed(2)}
                     </td>
                     <td className={`text-end fw-semibold ${isProfit ? 'text-success' : 'text-danger'}`}>
-                      {isProfit ? '+' : ''}{gainLoss.percentage}%
+                      {isProfit ? '+' : ''}{totalGainLossPercentage}%
                     </td>
                     <td className="text-center">
-                      <button
-                        className="btn btn-outline-danger btn-sm"
-                        onClick={() => handleDelete(investment.id)}
-                        title="Delete investment"
-                      >
-                        <i className="bi bi-trash"></i>
-                      </button>
+                      {editingInvestment === investment.id ? (
+                        <div className="d-flex gap-1 justify-content-center">
+                          <button
+                            className="btn btn-success btn-sm"
+                            onClick={() => handleEditSave(investment.id)}
+                            title="Save changes"
+                          >
+                            <i className="bi bi-check"></i>
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={handleEditCancel}
+                            title="Cancel edit"
+                          >
+                            <i className="bi bi-x"></i>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="d-flex gap-1 justify-content-center">
+                          <button
+                            className="btn btn-outline-primary btn-sm"
+                            onClick={() => handleEditStart(investment)}
+                            title="Edit investment"
+                          >
+                            <i className="bi bi-pencil"></i>
+                          </button>
+                          <button
+                            className="btn btn-outline-danger btn-sm"
+                            onClick={() => handleDelete(investment.id)}
+                            title="Delete investment"
+                          >
+                            <i className="bi bi-trash"></i>
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
@@ -734,7 +906,7 @@ const InvestmentsPage = () => {
               </div>
               <div className="row">
                 <div className="col-md-6 mb-3">
-                  <label htmlFor="purchase_value" className="form-label">Purchase Value (₹)</label>
+                  <label htmlFor="purchase_value" className="form-label">Purchase Value per unit (₹)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -747,7 +919,7 @@ const InvestmentsPage = () => {
                   />
                 </div>
                 <div className="col-md-6 mb-3">
-                  <label htmlFor="current_value" className="form-label">Current Value (₹)</label>
+                  <label htmlFor="current_value" className="form-label">Current Value per unit (₹)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -830,7 +1002,7 @@ const InvestmentsPage = () => {
                   <div className="d-flex justify-content-between">
                     <div>
                       <h6 className="card-title">Total Value</h6>
-                      <h4 className="mb-0">₹{investments.reduce((sum, inv) => sum + inv.current_value, 0).toFixed(2)}</h4>
+                      <h4 className="mb-0">₹{investments.reduce((sum, inv) => sum + (inv.qty * inv.current_value), 0).toFixed(2)}</h4>
                     </div>
                     <i className="bi bi-currency-rupee" style={{ fontSize: '2rem', opacity: 0.7 }}></i>
                   </div>
@@ -843,7 +1015,7 @@ const InvestmentsPage = () => {
                   <div className="d-flex justify-content-between">
                     <div>
                       <h6 className="card-title">Total Invested</h6>
-                      <h4 className="mb-0">₹{investments.reduce((sum, inv) => sum + inv.purchase_value, 0).toFixed(2)}</h4>
+                      <h4 className="mb-0">₹{investments.reduce((sum, inv) => sum + (inv.qty * inv.purchase_value), 0).toFixed(2)}</h4>
                     </div>
                     <i className="bi bi-wallet2" style={{ fontSize: '2rem', opacity: 0.7 }}></i>
                   </div>
@@ -852,7 +1024,7 @@ const InvestmentsPage = () => {
             </div>
             <div className="col-md-3">
               <div className={`card text-white ${
-                investments.reduce((sum, inv) => sum + (inv.current_value - inv.purchase_value), 0) >= 0 
+                investments.reduce((sum, inv) => sum + ((inv.qty * inv.current_value) - (inv.qty * inv.purchase_value)), 0) >= 0 
                   ? 'bg-success' 
                   : 'bg-danger'
               }`}>
@@ -861,12 +1033,12 @@ const InvestmentsPage = () => {
                     <div>
                       <h6 className="card-title">Total Gain/Loss</h6>
                       <h4 className="mb-0">
-                        {investments.reduce((sum, inv) => sum + (inv.current_value - inv.purchase_value), 0) >= 0 ? '+' : ''}
-                        ₹{investments.reduce((sum, inv) => sum + (inv.current_value - inv.purchase_value), 0).toFixed(2)}
+                        {investments.reduce((sum, inv) => sum + ((inv.qty * inv.current_value) - (inv.qty * inv.purchase_value)), 0) >= 0 ? '+' : ''}
+                        ₹{investments.reduce((sum, inv) => sum + ((inv.qty * inv.current_value) - (inv.qty * inv.purchase_value)), 0).toFixed(2)}
                       </h4>
                     </div>
                     <i className={`bi ${
-                      investments.reduce((sum, inv) => sum + (inv.current_value - inv.purchase_value), 0) >= 0 
+                      investments.reduce((sum, inv) => sum + ((inv.qty * inv.current_value) - (inv.qty * inv.purchase_value)), 0) >= 0 
                         ? 'bi-trending-up' 
                         : 'bi-trending-down'
                     }`} style={{ fontSize: '2rem', opacity: 0.7 }}></i>
