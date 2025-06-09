@@ -342,3 +342,81 @@ class Liability(models.Model):
             return 0
         paid_amount = self.get_paid_amount()
         return (paid_amount / self.principal_amount) * 100
+
+class MoneyLent(models.Model):
+    CURRENCY_CHOICES = [
+        ('INR', 'Indian Rupee (₹)'),
+        ('QAR', 'Qatari Riyal (ر.ق)'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('partially_returned', 'Partially Returned'),
+        ('fully_returned', 'Fully Returned'),
+        ('defaulted', 'Defaulted'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    borrower_name = models.CharField(max_length=255)
+    amount_lent = models.FloatField()  # Original amount given
+    amount_returned = models.FloatField(default=0)  # Amount returned so far
+    currency = models.CharField(max_length=10, choices=CURRENCY_CHOICES, default='INR')
+    date_lent = models.DateField()
+    expected_return_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    borrower_contact = models.CharField(max_length=255, blank=True, null=True)
+    purpose = models.CharField(max_length=255, blank=True, null=True)  # Why they borrowed
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def get_amount_lent_in_inr(self):
+        """Convert amount lent to INR using exchange rate"""
+        if self.currency == 'INR':
+            return self.amount_lent
+        try:
+            exchange_rate = ExchangeRate.objects.get(from_currency=self.currency, to_currency='INR')
+            return self.amount_lent * exchange_rate.rate
+        except ExchangeRate.DoesNotExist:
+            return self.amount_lent
+    
+    def get_amount_returned_in_inr(self):
+        """Convert amount returned to INR using exchange rate"""
+        if self.currency == 'INR':
+            return self.amount_returned
+        try:
+            exchange_rate = ExchangeRate.objects.get(from_currency=self.currency, to_currency='INR')
+            return self.amount_returned * exchange_rate.rate
+        except ExchangeRate.DoesNotExist:
+            return self.amount_returned
+    
+    def get_outstanding_amount(self):
+        """Get outstanding amount to be returned"""
+        return self.amount_lent - self.amount_returned
+    
+    def get_outstanding_amount_in_inr(self):
+        """Get outstanding amount in INR"""
+        outstanding = self.get_outstanding_amount()
+        if self.currency == 'INR':
+            return outstanding
+        try:
+            exchange_rate = ExchangeRate.objects.get(from_currency=self.currency, to_currency='INR')
+            return outstanding * exchange_rate.rate
+        except ExchangeRate.DoesNotExist:
+            return outstanding
+    
+    def get_return_percentage(self):
+        """Get percentage of amount returned"""
+        if self.amount_lent == 0:
+            return 0
+        return (self.amount_returned / self.amount_lent) * 100
+    
+    def update_status(self):
+        """Auto-update status based on amount returned"""
+        if self.amount_returned == 0:
+            self.status = 'active'
+        elif self.amount_returned >= self.amount_lent:
+            self.status = 'fully_returned'
+        else:
+            self.status = 'partially_returned'
+        self.save()

@@ -1,8 +1,8 @@
 from rest_framework import viewsets, permissions, status
-from .models import Investment, Income, Expense, Asset, ExchangeRate, Budget, Liability
+from .models import Investment, Income, Expense, Asset, ExchangeRate, Budget, Liability, MoneyLent
 from .serializers import (
     InvestmentSerializer, IncomeSerializer, ExpenseSerializer, 
-    AssetSerializer, ExchangeRateSerializer, LTPResponseSerializer, BudgetSerializer, LiabilitySerializer
+    AssetSerializer, ExchangeRateSerializer, LTPResponseSerializer, BudgetSerializer, LiabilitySerializer, MoneyLentSerializer
 )
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -495,6 +495,118 @@ class LiabilityViewSet(BaseViewSet):
         
         serializer = self.get_serializer(upcoming, many=True)
         return Response(serializer.data)
+
+class MoneyLentViewSet(BaseViewSet):
+    queryset = MoneyLent.objects.all()
+    serializer_class = MoneyLentSerializer
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        status_filter = self.request.query_params.get('status', None)
+        
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+            
+        return queryset.order_by('-date_lent')
+    
+    @action(detail=False, methods=['get'])
+    def statuses(self, request):
+        """Get all money lent statuses"""
+        return Response(MoneyLent.STATUS_CHOICES)
+    
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """Get money lent summary by status"""
+        money_lent_records = self.get_queryset()
+        
+        # Summary by status
+        status_summary = {}
+        for record in money_lent_records:
+            status = record.get_status_display()
+            if status not in status_summary:
+                status_summary[status] = {
+                    'total_lent': 0,
+                    'total_lent_inr': 0,
+                    'total_returned': 0,
+                    'total_returned_inr': 0,
+                    'total_outstanding': 0,
+                    'total_outstanding_inr': 0,
+                    'count': 0
+                }
+            
+            status_summary[status]['total_lent'] += record.amount_lent
+            status_summary[status]['total_lent_inr'] += record.get_amount_lent_in_inr()
+            status_summary[status]['total_returned'] += record.amount_returned
+            status_summary[status]['total_returned_inr'] += record.get_amount_returned_in_inr()
+            status_summary[status]['total_outstanding'] += record.get_outstanding_amount()
+            status_summary[status]['total_outstanding_inr'] += record.get_outstanding_amount_in_inr()
+            status_summary[status]['count'] += 1
+        
+        return Response({
+            'status_summary': status_summary,
+            'total_lent_inr': sum(record.get_amount_lent_in_inr() for record in money_lent_records),
+            'total_returned_inr': sum(record.get_amount_returned_in_inr() for record in money_lent_records),
+            'total_outstanding_inr': sum(record.get_outstanding_amount_in_inr() for record in money_lent_records),
+            'total_count': money_lent_records.count()
+        })
+    
+    @action(detail=False, methods=['get'])
+    def overdue(self, request):
+        """Get overdue money lent records"""
+        from datetime import date
+        
+        today = date.today()
+        overdue = self.get_queryset().filter(
+            status__in=['active', 'partially_returned'],
+            expected_return_date__lt=today
+        ).order_by('expected_return_date')
+        
+        serializer = self.get_serializer(overdue, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def record_payment(self, request, pk=None):
+        """Record a payment received for money lent"""
+        money_lent = self.get_object()
+        payment_amount = request.data.get('payment_amount')
+        
+        if not payment_amount:
+            return Response(
+                {'error': 'payment_amount is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            payment_amount = float(payment_amount)
+            if payment_amount <= 0:
+                return Response(
+                    {'error': 'payment_amount must be positive'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if payment exceeds outstanding amount
+            outstanding = money_lent.get_outstanding_amount()
+            if payment_amount > outstanding:
+                return Response(
+                    {'error': f'Payment amount ({payment_amount}) exceeds outstanding amount ({outstanding})'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Update amount returned
+            money_lent.amount_returned += payment_amount
+            money_lent.update_status()
+            
+            serializer = self.get_serializer(money_lent)
+            return Response({
+                'message': f'Payment of {payment_amount} {money_lent.currency} recorded successfully',
+                'money_lent': serializer.data
+            })
+            
+        except ValueError:
+            return Response(
+                {'error': 'Invalid payment_amount'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 class ExchangeRateViewSet(viewsets.ModelViewSet):
     queryset = ExchangeRate.objects.all()

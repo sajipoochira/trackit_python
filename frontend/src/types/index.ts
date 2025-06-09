@@ -117,6 +117,29 @@ export interface Liability {
   updated_at: string;
 }
 
+export interface MoneyLent {
+  id: number;
+  borrower_name: string;
+  amount_lent: number;
+  amount_returned: number;
+  currency: string;
+  currency_display: string;
+  date_lent: string;
+  expected_return_date?: string;
+  status: string;
+  status_display: string;
+  borrower_contact?: string;
+  purpose?: string;
+  notes?: string;
+  amount_lent_in_inr: number;
+  amount_returned_in_inr: number;
+  outstanding_amount: number;
+  outstanding_amount_in_inr: number;
+  return_percentage: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ExchangeRate {
   id: number;
   from_currency: string;

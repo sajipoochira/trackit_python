@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Investment, Income, Expense, Asset, ExchangeRate, Budget, Liability
+from .models import Investment, Income, Expense, Asset, ExchangeRate, Budget, Liability, MoneyLent
 
 class InvestmentSerializer(serializers.ModelSerializer):
     amount_in_inr = serializers.SerializerMethodField()
@@ -137,6 +137,46 @@ class LiabilitySerializer(serializers.ModelSerializer):
     
     def get_completion_percentage(self, obj):
         return obj.get_completion_percentage()
+
+class MoneyLentSerializer(serializers.ModelSerializer):
+    amount_lent_in_inr = serializers.SerializerMethodField()
+    amount_returned_in_inr = serializers.SerializerMethodField()
+    outstanding_amount = serializers.SerializerMethodField()
+    outstanding_amount_in_inr = serializers.SerializerMethodField()
+    return_percentage = serializers.SerializerMethodField()
+    currency_display = serializers.CharField(source='get_currency_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
+    class Meta:
+        model = MoneyLent
+        fields = '__all__'
+        read_only_fields = ['user', 'created_at', 'updated_at']
+    
+    def get_amount_lent_in_inr(self, obj):
+        return obj.get_amount_lent_in_inr()
+    
+    def get_amount_returned_in_inr(self, obj):
+        return obj.get_amount_returned_in_inr()
+    
+    def get_outstanding_amount(self, obj):
+        return obj.get_outstanding_amount()
+    
+    def get_outstanding_amount_in_inr(self, obj):
+        return obj.get_outstanding_amount_in_inr()
+    
+    def get_return_percentage(self, obj):
+        return obj.get_return_percentage()
+    
+    def update(self, instance, validated_data):
+        # Auto-update status when amount_returned changes
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if 'amount_returned' in validated_data:
+            instance.update_status()
+        
+        return instance
 
 class ExchangeRateSerializer(serializers.ModelSerializer):
     class Meta:

@@ -3,7 +3,7 @@ from django.contrib import admin
 from rest_framework.routers import DefaultRouter
 from finance.views import (
     InvestmentViewSet, IncomeViewSet, ExpenseViewSet, 
-    AssetViewSet, ExchangeRateViewSet, LTPViewSet, BudgetViewSet, LiabilityViewSet
+    AssetViewSet, ExchangeRateViewSet, LTPViewSet, BudgetViewSet, LiabilityViewSet, MoneyLentViewSet
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
@@ -14,6 +14,7 @@ router.register(r'expenses', ExpenseViewSet)
 router.register(r'budgets', BudgetViewSet)
 router.register(r'assets', AssetViewSet)
 router.register(r'liabilities', LiabilityViewSet)
+router.register(r'money-lent', MoneyLentViewSet)
 router.register(r'exchange-rates', ExchangeRateViewSet)
 router.register(r'ltp', LTPViewSet, basename='ltp')
 
