@@ -3,7 +3,7 @@ import { fetchInvestments } from '../api/investments';
 import { fetchIncomes, getIncomeSummary } from '../api/income';
 import { fetchExpenses, getExpenseSummary, getCurrentMonthSummary } from '../api/expenses';
 import { fetchAssets, getAssetSummary } from '../api/assets';
-import { getCurrentRates, formatCurrency } from '../api/exchangeRates';
+import { getCurrentRates } from '../api/exchangeRates';
 import { Investment, Income, Expense, Asset } from '../types';
 import Layout from '../components/Layout';
 
@@ -195,7 +195,7 @@ const DashboardPage = () => {
     return (
       <Layout>
         <div className="text-center py-5">
-          <div className="spinner-border text-primary\" role="status">
+          <div className="spinner-border text-primary" role="status">
             <span className="visually-hidden">Loading...</span>
           </div>
           <p className="mt-2 text-muted">Loading dashboard...</p>
@@ -380,6 +380,12 @@ const DashboardPage = () => {
                     </div>
                   </div>
                 ))}
+                {recentTransactions.length === 0 && (
+                  <div className="list-group-item text-center text-muted">
+                    <i className="bi bi-clock-history me-2"></i>
+                    No transactions yet
+                  </div>
+                )}
               </div>
             </div>
           </div>

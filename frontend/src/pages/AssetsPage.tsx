@@ -34,6 +34,10 @@ const AssetsPage = () => {
     currency: 'INR',
     purchase_date: '',
     notes: '',
+    // Bank account specific fields
+    account_number: '',
+    bank_name: '',
+    account_type: '',
   });
   const [exchangeRateForm, setExchangeRateForm] = useState({
     from_currency: 'QAR',
@@ -44,6 +48,16 @@ const AssetsPage = () => {
   const currencyOptions = [
     { value: 'INR', label: 'Indian Rupee (₹)', symbol: '₹' },
     { value: 'QAR', label: 'Qatari Riyal (ر.ق)', symbol: 'ر.ق' },
+  ];
+
+  const accountTypes = [
+    'Savings',
+    'Current',
+    'Fixed Deposit',
+    'Recurring Deposit',
+    'NRI',
+    'Joint',
+    'Other'
   ];
 
   const load = async () => {
@@ -79,6 +93,10 @@ const AssetsPage = () => {
         currency: formData.currency,
         purchase_date: formData.purchase_date || undefined,
         notes: formData.notes,
+        // Bank account specific fields
+        account_number: formData.type === 'bank_account' ? formData.account_number : undefined,
+        bank_name: formData.type === 'bank_account' ? formData.bank_name : undefined,
+        account_type: formData.type === 'bank_account' ? formData.account_type : undefined,
       };
 
       await createAsset(data);
@@ -89,6 +107,9 @@ const AssetsPage = () => {
         currency: 'INR',
         purchase_date: '',
         notes: '',
+        account_number: '',
+        bank_name: '',
+        account_type: '',
       });
       setShowForm(false);
       load();
@@ -185,6 +206,7 @@ const AssetsPage = () => {
       'furniture': 'bi-chair',
       'art': 'bi-palette',
       'equipment': 'bi-tools',
+      'bank_account': 'bi-bank',
       'other': 'bi-box'
     };
     return icons[type] || 'bi-box';
@@ -199,6 +221,7 @@ const AssetsPage = () => {
       'furniture': 'secondary',
       'art': 'danger',
       'equipment': 'dark',
+      'bank_account': 'success',
       'other': 'light'
     };
     return colors[type] || 'light';
@@ -389,6 +412,29 @@ const AssetsPage = () => {
                       <span>{new Date(asset.purchase_date).toLocaleDateString()}</span>
                     </div>
                   )}
+                  {/* Bank account specific fields */}
+                  {asset.type === 'bank_account' && (
+                    <>
+                      {asset.bank_name && (
+                        <div className="d-flex justify-content-between mb-2">
+                          <span className="text-muted">Bank:</span>
+                          <span>{asset.bank_name}</span>
+                        </div>
+                      )}
+                      {asset.account_number && (
+                        <div className="d-flex justify-content-between mb-2">
+                          <span className="text-muted">Account:</span>
+                          <span>****{asset.account_number.slice(-4)}</span>
+                        </div>
+                      )}
+                      {asset.account_type && (
+                        <div className="d-flex justify-content-between mb-2">
+                          <span className="text-muted">Type:</span>
+                          <span>{asset.account_type}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
                   {asset.notes && (
                     <div className="mt-2">
                       <small className="text-muted">{asset.notes}</small>
@@ -421,6 +467,7 @@ const AssetsPage = () => {
                 <th className="text-end">Current Value</th>
                 <th className="text-end">Value (INR)</th>
                 <th>Purchase Date</th>
+                <th>Bank Details</th>
                 <th>Notes</th>
                 <th className="text-center">Actions</th>
               </tr>
@@ -467,6 +514,17 @@ const AssetsPage = () => {
                   <td>
                     {asset.purchase_date ? (
                       new Date(asset.purchase_date).toLocaleDateString()
+                    ) : (
+                      <span className="text-muted">-</span>
+                    )}
+                  </td>
+                  <td>
+                    {asset.type === 'bank_account' ? (
+                      <div>
+                        {asset.bank_name && <div className="small">{asset.bank_name}</div>}
+                        {asset.account_number && <div className="small text-muted">****{asset.account_number.slice(-4)}</div>}
+                        {asset.account_type && <div className="small text-muted">{asset.account_type}</div>}
+                      </div>
                     ) : (
                       <span className="text-muted">-</span>
                     )}
@@ -545,7 +603,7 @@ const AssetsPage = () => {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="h2 mb-0">
           <i className="bi bi-house me-2 text-info"></i>
-          Assets
+          Assets & Bank Accounts
           {selectedType && <span className="text-muted"> - {selectedType}</span>}
         </h1>
         <div className="d-flex gap-2 align-items-center">
@@ -767,7 +825,7 @@ const AssetsPage = () => {
                     id="name"
                     value={formData.name}
                     onChange={e => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g., Honda City, Gold Necklace, MacBook Pro"
+                    placeholder="e.g., Honda City, Gold Necklace, HDFC Savings Account"
                     required
                   />
                 </div>
@@ -787,9 +845,54 @@ const AssetsPage = () => {
                   </select>
                 </div>
               </div>
+
+              {/* Bank Account Specific Fields */}
+              {formData.type === 'bank_account' && (
+                <div className="row">
+                  <div className="col-md-4 mb-3">
+                    <label htmlFor="bank_name" className="form-label">Bank Name</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="bank_name"
+                      value={formData.bank_name}
+                      onChange={e => setFormData({ ...formData, bank_name: e.target.value })}
+                      placeholder="e.g., HDFC Bank, SBI, ICICI Bank"
+                    />
+                  </div>
+                  <div className="col-md-4 mb-3">
+                    <label htmlFor="account_number" className="form-label">Account Number</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="account_number"
+                      value={formData.account_number}
+                      onChange={e => setFormData({ ...formData, account_number: e.target.value })}
+                      placeholder="Account number"
+                    />
+                  </div>
+                  <div className="col-md-4 mb-3">
+                    <label htmlFor="account_type" className="form-label">Account Type</label>
+                    <select
+                      className="form-select"
+                      id="account_type"
+                      value={formData.account_type}
+                      onChange={e => setFormData({ ...formData, account_type: e.target.value })}
+                    >
+                      <option value="">Select type...</option>
+                      {accountTypes.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
               <div className="row">
                 <div className="col-md-4 mb-3">
-                  <label htmlFor="value" className="form-label">Current Value</label>
+                  <label htmlFor="value" className="form-label">
+                    {formData.type === 'bank_account' ? 'Current Balance' : 'Current Value'}
+                  </label>
                   <input
                     type="number"
                     step="0.01"
@@ -815,7 +918,9 @@ const AssetsPage = () => {
                   </select>
                 </div>
                 <div className="col-md-4 mb-3">
-                  <label htmlFor="purchase_date" className="form-label">Purchase Date (Optional)</label>
+                  <label htmlFor="purchase_date" className="form-label">
+                    {formData.type === 'bank_account' ? 'Account Opening Date (Optional)' : 'Purchase Date (Optional)'}
+                  </label>
                   <input
                     type="date"
                     className="form-control"
@@ -865,7 +970,7 @@ const AssetsPage = () => {
         <div className="text-center py-5">
           <i className="bi bi-house text-muted" style={{ fontSize: '4rem' }}></i>
           <h3 className="text-muted mt-3">No assets yet</h3>
-          <p className="text-muted">Start tracking your assets by adding your first one!</p>
+          <p className="text-muted">Start tracking your assets and bank accounts by adding your first one!</p>
           <button
             className="btn btn-info"
             onClick={() => setShowForm(true)}
@@ -923,10 +1028,10 @@ const AssetsPage = () => {
                   <div className="card-body">
                     <div className="d-flex justify-content-between">
                       <div>
-                        <h6 className="card-title">Avg Value</h6>
-                        <h4 className="mb-0">₹{getFilteredAssets().length > 0 ? (getFilteredAssets().reduce((sum, asset) => sum + asset.value_in_inr, 0) / getFilteredAssets().length).toFixed(2) : '0.00'}</h4>
+                        <h6 className="card-title">Bank Accounts</h6>
+                        <h4 className="mb-0">{assets.filter(a => a.type === 'bank_account').length}</h4>
                       </div>
-                      <i className="bi bi-calculator" style={{ fontSize: '2rem', opacity: 0.7 }}></i>
+                      <i className="bi bi-bank" style={{ fontSize: '2rem', opacity: 0.7 }}></i>
                     </div>
                   </div>
                 </div>
