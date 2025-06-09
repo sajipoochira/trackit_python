@@ -25,6 +25,16 @@ class BaseViewSet(viewsets.ModelViewSet):
 class InvestmentViewSet(BaseViewSet):
     queryset = Investment.objects.all()
     serializer_class = InvestmentSerializer
+    
+    def update(self, request, *args, **kwargs):
+        # Enable partial updates by default
+        kwargs['partial'] = True
+        return super().update(request, *args, **kwargs)
+    
+    def partial_update(self, request, *args, **kwargs):
+        # Ensure partial updates are handled properly
+        kwargs['partial'] = True
+        return super().update(request, *args, **kwargs)
 
 class IncomeViewSet(BaseViewSet):
     queryset = Income.objects.all()
