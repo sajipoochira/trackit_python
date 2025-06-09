@@ -5,6 +5,7 @@ import InvestmentsPage from './pages/InvestmentsPage';
 import IncomePage from './pages/IncomePage';
 import ExpensesPage from './pages/ExpensesPage';
 import AssetsPage from './pages/AssetsPage';
+import LiabilitiesPage from './pages/LiabilitiesPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -37,7 +38,12 @@ function App() {
             <AssetsPage />
           </ProtectedRoute>
         } />
-        <Route path="/" element={<Navigate to="/dashboard\" replace />} />
+        <Route path="/liabilities" element={
+          <ProtectedRoute>
+            <LiabilitiesPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
   );
