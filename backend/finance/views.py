@@ -1,15 +1,15 @@
 from rest_framework import viewsets, permissions, status
-from .models import Investment, Income, Expense, Asset, ExchangeRate
+from .models import Investment, Income, Expense, Asset, ExchangeRate, Budget
 from .serializers import (
     InvestmentSerializer, IncomeSerializer, ExpenseSerializer, 
-    AssetSerializer, ExchangeRateSerializer, LTPResponseSerializer
+    AssetSerializer, ExchangeRateSerializer, LTPResponseSerializer, BudgetSerializer
 )
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from nsetools import Nse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
 import logging
 
@@ -118,9 +118,152 @@ class IncomeViewSet(BaseViewSet):
             'total_count': incomes.count()
         })
 
+class BudgetViewSet(BaseViewSet):
+    queryset = Budget.objects.all()
+    serializer_class = BudgetSerializer
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        period = self.request.query_params.get('period', None)
+        is_active = self.request.query_params.get('is_active', None)
+        
+        if period:
+            queryset = queryset.filter(period=period)
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+            
+        return queryset.order_by('-created_at')
+    
+    @action(detail=False, methods=['get'])
+    def categories(self, request):
+        """Get all budget categories based on expense categories"""
+        categories = []
+        for code, display in Expense.EXPENSE_CATEGORIES:
+            categories.append([display, display])
+        return Response(categories)
+    
+    @action(detail=False, methods=['get'])
+    def periods(self, request):
+        """Get all budget periods"""
+        return Response(Budget.BUDGET_PERIODS)
+    
+    @action(detail=False, methods=['post'])
+    def create_monthly_budget(self, request):
+        """Create monthly budget for current month"""
+        current_date = date.today()
+        start_date = current_date.replace(day=1)
+        
+        # Calculate end date (last day of current month)
+        if current_date.month == 12:
+            end_date = current_date.replace(year=current_date.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            end_date = current_date.replace(month=current_date.month + 1, day=1) - timedelta(days=1)
+        
+        category = request.data.get('category')
+        allocated_amount = request.data.get('allocated_amount')
+        currency = request.data.get('currency', 'QAR')
+        
+        if not category or not allocated_amount:
+            return Response(
+                {'error': 'category and allocated_amount are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if budget already exists for this category and period
+        existing_budget = Budget.objects.filter(
+            user=request.user,
+            category=category,
+            period='monthly',
+            start_date=start_date,
+            end_date=end_date
+        ).first()
+        
+        if existing_budget:
+            return Response(
+                {'error': f'Budget for {category} already exists for this month'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        budget = Budget.objects.create(
+            user=request.user,
+            category=category,
+            allocated_amount=float(allocated_amount),
+            currency=currency,
+            period='monthly',
+            start_date=start_date,
+            end_date=end_date,
+            notes=request.data.get('notes', '')
+        )
+        
+        serializer = BudgetSerializer(budget)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    @action(detail=False, methods=['get'])
+    def current_month_summary(self, request):
+        """Get budget summary for current month"""
+        current_date = date.today()
+        start_date = current_date.replace(day=1)
+        
+        # Calculate end date (last day of current month)
+        if current_date.month == 12:
+            end_date = current_date.replace(year=current_date.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            end_date = current_date.replace(month=current_date.month + 1, day=1) - timedelta(days=1)
+        
+        budgets = Budget.objects.filter(
+            user=request.user,
+            period='monthly',
+            start_date=start_date,
+            end_date=end_date,
+            is_active=True
+        )
+        
+        total_allocated = sum(budget.get_allocated_amount_in_inr() for budget in budgets)
+        total_spent = sum(budget.get_spent_amount() for budget in budgets)
+        total_remaining = total_allocated - total_spent
+        
+        budget_data = []
+        for budget in budgets:
+            budget_data.append({
+                'id': budget.id,
+                'category': budget.category,
+                'allocated_amount': budget.allocated_amount,
+                'currency': budget.currency,
+                'allocated_amount_inr': budget.get_allocated_amount_in_inr(),
+                'spent_amount': budget.get_spent_amount(),
+                'remaining_amount': budget.get_remaining_amount(),
+                'utilization_percentage': budget.get_utilization_percentage()
+            })
+        
+        return Response({
+            'period': f"{start_date.strftime('%B %Y')}",
+            'start_date': start_date,
+            'end_date': end_date,
+            'total_allocated_inr': total_allocated,
+            'total_spent_inr': total_spent,
+            'total_remaining_inr': total_remaining,
+            'overall_utilization_percentage': (total_spent / total_allocated * 100) if total_allocated > 0 else 0,
+            'budgets': budget_data
+        })
+
 class ExpenseViewSet(BaseViewSet):
     queryset = Expense.objects.all()
     serializer_class = ExpenseSerializer
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        category = self.request.query_params.get('category', None)
+        start_date = self.request.query_params.get('start_date', None)
+        end_date = self.request.query_params.get('end_date', None)
+        
+        if category:
+            queryset = queryset.filter(category=category)
+        if start_date:
+            queryset = queryset.filter(date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(date__lte=end_date)
+            
+        return queryset.order_by('-date')
     
     @action(detail=False, methods=['get'])
     def categories(self, request):
@@ -156,6 +299,54 @@ class ExpenseViewSet(BaseViewSet):
             'category_summary': category_summary,
             'total_expense_inr': sum(expense.get_amount_in_inr() for expense in expenses),
             'total_count': expenses.count()
+        })
+    
+    @action(detail=False, methods=['get'])
+    def budget_analysis(self, request):
+        """Get expense analysis against budgets"""
+        current_date = date.today()
+        start_date = current_date.replace(day=1)
+        
+        # Calculate end date (last day of current month)
+        if current_date.month == 12:
+            end_date = current_date.replace(year=current_date.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            end_date = current_date.replace(month=current_date.month + 1, day=1) - timedelta(days=1)
+        
+        # Get current month expenses
+        expenses = Expense.objects.filter(
+            user=request.user,
+            date__gte=start_date,
+            date__lte=end_date
+        )
+        
+        # Get active budgets
+        budgets = Budget.objects.filter(
+            user=request.user,
+            period='monthly',
+            start_date=start_date,
+            end_date=end_date,
+            is_active=True
+        )
+        
+        analysis = []
+        for budget in budgets:
+            category_expenses = expenses.filter(category=budget.category.lower().replace(' ', '_'))
+            spent_amount = sum(expense.get_amount_in_inr() for expense in category_expenses)
+            
+            analysis.append({
+                'category': budget.category,
+                'allocated_amount': budget.get_allocated_amount_in_inr(),
+                'spent_amount': spent_amount,
+                'remaining_amount': budget.get_allocated_amount_in_inr() - spent_amount,
+                'utilization_percentage': (spent_amount / budget.get_allocated_amount_in_inr() * 100) if budget.get_allocated_amount_in_inr() > 0 else 0,
+                'is_over_budget': spent_amount > budget.get_allocated_amount_in_inr(),
+                'expense_count': category_expenses.count()
+            })
+        
+        return Response({
+            'period': f"{start_date.strftime('%B %Y')}",
+            'analysis': analysis
         })
 
 class AssetViewSet(BaseViewSet):

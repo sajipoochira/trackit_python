@@ -30,6 +30,26 @@ export interface Income {
   created_at: string;
 }
 
+export interface Budget {
+  id: number;
+  category: string;
+  allocated_amount: number;
+  currency: string;
+  currency_display: string;
+  period: string;
+  period_display: string;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+  notes: string;
+  allocated_amount_in_inr: number;
+  spent_amount: number;
+  remaining_amount: number;
+  utilization_percentage: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Expense {
   id: number;
   title: string;
@@ -42,6 +62,13 @@ export interface Expense {
   date: string;
   notes?: string;
   created_at: string;
+  budget_info?: {
+    id: number;
+    allocated_amount: number;
+    currency: string;
+    remaining_amount: number;
+    utilization_percentage: number;
+  };
 }
 
 export interface Asset {
