@@ -15,6 +15,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   const navItems = [
+    { path: '/dashboard', label: 'Dashboard', icon: 'bi-speedometer2' },
     { path: '/investments', label: 'Investments', icon: 'bi-graph-up' },
     { path: '/income', label: 'Income', icon: 'bi-cash-coin' },
     { path: '/expenses', label: 'Expenses', icon: 'bi-credit-card' },
@@ -26,7 +27,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Navigation */}
       <nav className="navbar navbar-expand-lg navbar-dark bg-primary shadow">
         <div className="container">
-          <Link className="navbar-brand fw-bold" to="/">
+          <Link className="navbar-brand fw-bold" to="/dashboard">
             <i className="bi bi-graph-up-arrow me-2"></i>
             TrackIt
           </Link>
@@ -43,7 +44,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="collapse navbar-collapse" id="navbarNav">
             <ul className="navbar-nav me-auto">
               {navItems.map((item) => (
-                <li className="nav-item\" key={item.path}>
+                <li className="nav-item" key={item.path}>
                   <Link 
                     className={`nav-link ${location.pathname === item.path ? 'active' : ''}`}
                     to={item.path}
@@ -64,7 +65,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </button>
           </div>
         </div>
-      </nav>
+      </div>
 
       {/* Main Content */}
       <main className="container py-4">

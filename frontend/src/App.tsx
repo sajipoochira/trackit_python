@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
 import InvestmentsPage from './pages/InvestmentsPage';
 import IncomePage from './pages/IncomePage';
 import ExpensesPage from './pages/ExpensesPage';
@@ -11,6 +12,11 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/dashboard" element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        } />
         <Route path="/investments" element={
           <ProtectedRoute>
             <InvestmentsPage />
@@ -31,7 +37,7 @@ function App() {
             <AssetsPage />
           </ProtectedRoute>
         } />
-        <Route path="/" element={<Navigate to="/investments" replace />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
   );
