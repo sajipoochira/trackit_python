@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { fetchInvestments, createInvestment, deleteInvestment, updateInvestment, getLTP } from '../api/investments';
 import { Investment } from '../types';
 import Layout from '../components/Layout';
-import KiteAuth from '../components/KiteAuth';
 
 const InvestmentsPage = () => {
   const [investments, setInvestments] = useState<Investment[]>([]);
@@ -10,7 +9,6 @@ const InvestmentsPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
-  const [showKiteAuth, setShowKiteAuth] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvPreview, setCsvPreview] = useState<any[]>([]);
   const [uploadLoading, setUploadLoading] = useState(false);
@@ -84,20 +82,11 @@ const InvestmentsPage = () => {
     }
   };
 
-  const checkKiteAuth = () => {
-    const kiteAccessToken = localStorage.getItem('kite_access_token');
-    return !!kiteAccessToken;
-  };
-
   const handleRefreshPrices = async () => {
-    if (!checkKiteAuth()) {
-      setShowKiteAuth(true);
-      return;
-    }
-
     setPriceUpdateLoading(true);
     let updatedCount = 0;
     let errorCount = 0;
+    const errors: string[] = [];
 
     for (const investment of investments) {
       if (investment.symbol && investment.type === 'Stock') {
@@ -109,9 +98,10 @@ const InvestmentsPage = () => {
             current_value: newCurrentValue
           });
           updatedCount++;
-        } catch (err) {
+        } catch (err: any) {
           console.error(`Failed to update price for ${investment.symbol}:`, err);
           errorCount++;
+          errors.push(`${investment.symbol}: ${err.response?.data?.error || err.message}`);
         }
       }
     }
@@ -124,16 +114,12 @@ const InvestmentsPage = () => {
 
     if (errorCount === 0 && updatedCount > 0) {
       alert(`Successfully updated ${updatedCount} stock prices!`);
-    } else if (updatedCount === 0) {
+    } else if (updatedCount === 0 && errorCount === 0) {
       alert('No stocks with symbols found to update');
     } else {
-      alert(`Updated ${updatedCount} prices, ${errorCount} failed`);
+      const message = `Updated ${updatedCount} prices successfully.${errorCount > 0 ? `\n\nErrors (${errorCount}):\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? '\n...' : ''}` : ''}`;
+      alert(message);
     }
-  };
-
-  const handleKiteAuthSuccess = (accessToken: string) => {
-    setShowKiteAuth(false);
-    alert('Kite authentication successful! You can now refresh stock prices.');
   };
 
   const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -287,7 +273,6 @@ const InvestmentsPage = () => {
   };
 
   const hasStocksWithSymbols = investments.some(inv => inv.symbol && inv.type === 'Stock');
-  const isKiteAuthenticated = checkKiteAuth();
 
   useEffect(() => {
     load();
@@ -295,13 +280,6 @@ const InvestmentsPage = () => {
 
   return (
     <Layout>
-      {showKiteAuth && (
-        <KiteAuth
-          onAuthSuccess={handleKiteAuthSuccess}
-          onClose={() => setShowKiteAuth(false)}
-        />
-      )}
-
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="h2 mb-0">
           <i className="bi bi-graph-up me-2 text-primary"></i>
@@ -323,9 +301,6 @@ const InvestmentsPage = () => {
                 <>
                   <i className="bi bi-arrow-clockwise me-1"></i>
                   Refresh Prices
-                  {!isKiteAuthenticated && (
-                    <i className="bi bi-shield-exclamation ms-1 text-warning" title="Kite authentication required"></i>
-                  )}
                 </>
               )}
             </button>
@@ -346,19 +321,6 @@ const InvestmentsPage = () => {
           </button>
         </div>
       </div>
-
-      {!isKiteAuthenticated && hasStocksWithSymbols && (
-        <div className="alert alert-warning">
-          <i className="bi bi-shield-exclamation me-2"></i>
-          <strong>Kite Authentication Required:</strong> To fetch real-time stock prices, please authenticate with Kite Connect.
-          <button
-            className="btn btn-outline-warning btn-sm ms-2"
-            onClick={() => setShowKiteAuth(true)}
-          >
-            Authenticate Now
-          </button>
-        </div>
-      )}
 
       {error && (
         <div className="alert alert-danger" role="alert">
@@ -534,10 +496,10 @@ const InvestmentsPage = () => {
                     id="symbol"
                     value={formData.symbol}
                     onChange={e => setFormData({ ...formData, symbol: e.target.value.toUpperCase() })}
-                    placeholder="e.g., AAPL, GOOGL, TSLA"
+                    placeholder="e.g., RELIANCE, TCS, INFY"
                   />
                   <small className="text-muted">
-                    Add symbol to enable automatic price updates for stocks
+                    Add NSE symbol to enable automatic price updates for stocks
                   </small>
                 </div>
               </div>

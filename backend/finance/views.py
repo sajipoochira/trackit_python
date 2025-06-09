@@ -1,21 +1,13 @@
 from rest_framework import viewsets, permissions
 from .models import Investment, Income, Expense, Asset
 from .serializers import InvestmentSerializer, IncomeSerializer, ExpenseSerializer, AssetSerializer, LTPResponseSerializer
-from tools.kite import get_price
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from nsetools import Nse
-
-from kiteconnect import KiteConnect
-import os
-from dotenv import load_dotenv
 import logging
-
-# Load environment variables
-load_dotenv()
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -46,20 +38,32 @@ class AssetViewSet(BaseViewSet):
     queryset = Asset.objects.all()
     serializer_class = AssetSerializer
 
-
-
 class LTPViewSet(viewsets.ViewSet):
+    permission_classes = [AllowAny]
 
-    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    @action(detail=False, methods=['get'])
     def get_price(self, request):
         symbol = request.query_params.get('symbol')
         if not symbol:
             return Response({'error': 'Symbol parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
+            logger.debug(f"Fetching price for symbol: {symbol}")
             nse = Nse()
+            
+            # Try to get quote for the symbol
             stock_data = nse.get_quote(symbol.upper())
-            ltp = stock_data['lastPrice']
+            
+            if not stock_data:
+                return Response({'error': f'Stock data not found for symbol: {symbol}'}, status=status.HTTP_404_NOT_FOUND)
+            
+            ltp = stock_data.get('lastPrice')
+            if ltp is None:
+                return Response({'error': f'Last price not available for symbol: {symbol}'}, status=status.HTTP_404_NOT_FOUND)
+            
+            logger.debug(f"Successfully fetched LTP for {symbol}: {ltp}")
             return Response({'symbol': symbol, 'ltp': ltp}, status=status.HTTP_200_OK)
+            
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error(f"Error fetching price for {symbol}: {str(e)}")
+            return Response({'error': f'Failed to fetch price for {symbol}: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
