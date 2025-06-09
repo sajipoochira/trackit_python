@@ -44,7 +44,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="collapse navbar-collapse" id="navbarNav">
             <ul className="navbar-nav me-auto">
               {navItems.map((item) => (
-                <li className="nav-item\" key={item.path}>
+                <li className="nav-item" key={item.path}>
                   <Link 
                     className={`nav-link ${location.pathname === item.path ? 'active' : ''}`}
                     to={item.path}
@@ -65,7 +65,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </button>
           </div>
         </div>
-      </div>
+      </nav>
 
       {/* Main Content */}
       <main className="container py-4">
