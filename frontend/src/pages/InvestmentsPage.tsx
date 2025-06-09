@@ -13,6 +13,7 @@ const InvestmentsPage = () => {
   const [csvPreview, setCsvPreview] = useState<any[]>([]);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [priceUpdateLoading, setPriceUpdateLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<'tiles' | 'list'>('tiles');
   const [formData, setFormData] = useState({
     name: '',
     symbol: '',
@@ -221,10 +222,10 @@ const InvestmentsPage = () => {
   const downloadSampleCsv = () => {
     const sampleData = [
       'name,symbol,type,qty,purchase_value,current_value',
-      'Apple Stock,AAPL,Stock,10,150.00,175.50',
+      'Reliance Stock,RELIANCE,Stock,10,2500.00,2750.50',
       'Gold Investment,,Gold,5,1800.00,1950.00',
       'Tech Startup,,Business,1,10000.00,12500.00',
-      'Bitcoin,,Cryptocurrency,0.5,45000.00,42000.00'
+      'TCS Stock,TCS,Stock,5,3200.00,3450.00'
     ].join('\n');
 
     const blob = new Blob([sampleData], { type: 'text/csv' });
@@ -274,6 +275,172 @@ const InvestmentsPage = () => {
 
   const hasStocksWithSymbols = investments.some(inv => inv.symbol && inv.type === 'Stock');
 
+  const renderTileView = () => (
+    <div className="row">
+      {investments.map((investment) => {
+        const gainLoss = calculateGainLoss(investment.current_value, investment.purchase_value);
+        const isProfit = gainLoss.amount >= 0;
+
+        return (
+          <div key={investment.id} className="col-md-6 col-lg-4 mb-4">
+            <div className="card h-100 shadow-sm">
+              <div className="card-body">
+                <div className="d-flex justify-content-between align-items-start mb-3">
+                  <div>
+                    <h5 className="card-title mb-1">{investment.name}</h5>
+                    <div className="d-flex gap-2 align-items-center">
+                      <span className={`badge bg-${getTypeColor(investment.type)}`}>
+                        <i className={`${getTypeIcon(investment.type)} me-1`}></i>
+                        {investment.type}
+                      </span>
+                      {investment.symbol && (
+                        <span className="badge bg-info">
+                          <i className="bi bi-graph-up me-1"></i>
+                          {investment.symbol}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    className="btn btn-outline-danger btn-sm"
+                    onClick={() => handleDelete(investment.id)}
+                    title="Delete investment"
+                  >
+                    <i className="bi bi-trash"></i>
+                  </button>
+                </div>
+
+                <div className="mb-3">
+                  <div className="d-flex justify-content-between mb-2">
+                    <span className="text-muted">Quantity:</span>
+                    <span className="fw-bold">{investment.qty}</span>
+                  </div>
+                  <div className="d-flex justify-content-between mb-2">
+                    <span className="text-muted">Purchase Value:</span>
+                    <span className="fw-bold">₹{investment.purchase_value.toFixed(2)}</span>
+                  </div>
+                  <div className="d-flex justify-content-between mb-2">
+                    <span className="text-muted">Current Value:</span>
+                    <span className="fw-bold">₹{investment.current_value.toFixed(2)}</span>
+                  </div>
+                  <hr />
+                  <div className="d-flex justify-content-between">
+                    <span className="text-muted">Gain/Loss:</span>
+                    <div className="text-end">
+                      <div className={`fw-bold ${isProfit ? 'text-success' : 'text-danger'}`}>
+                        {isProfit ? '+' : ''}₹{gainLoss.amount.toFixed(2)}
+                      </div>
+                      <small className={isProfit ? 'text-success' : 'text-danger'}>
+                        ({isProfit ? '+' : ''}{gainLoss.percentage}%)
+                      </small>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="progress" style={{ height: '6px' }}>
+                  <div
+                    className={`progress-bar ${isProfit ? 'bg-success' : 'bg-danger'}`}
+                    style={{ width: `${Math.min(Math.abs(parseFloat(gainLoss.percentage)), 100)}%` }}
+                  ></div>
+                </div>
+              </div>
+              <div className="card-footer text-muted">
+                <small>
+                  <i className="bi bi-calendar me-1"></i>
+                  Added {new Date(investment.created_at).toLocaleDateString()}
+                  {investment.last_updated && (
+                    <>
+                      <br />
+                      <i className="bi bi-arrow-clockwise me-1"></i>
+                      Updated {new Date(investment.last_updated).toLocaleDateString()}
+                    </>
+                  )}
+                </small>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderListView = () => (
+    <div className="card">
+      <div className="card-body p-0">
+        <div className="table-responsive">
+          <table className="table table-hover mb-0">
+            <thead className="table-light">
+              <tr>
+                <th>Investment</th>
+                <th>Type</th>
+                <th>Symbol</th>
+                <th className="text-end">Qty</th>
+                <th className="text-end">Purchase Value</th>
+                <th className="text-end">Current Value</th>
+                <th className="text-end">Gain/Loss</th>
+                <th className="text-end">%</th>
+                <th className="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {investments.map((investment) => {
+                const gainLoss = calculateGainLoss(investment.current_value, investment.purchase_value);
+                const isProfit = gainLoss.amount >= 0;
+
+                return (
+                  <tr key={investment.id}>
+                    <td>
+                      <div>
+                        <div className="fw-semibold">{investment.name}</div>
+                        <small className="text-muted">
+                          Added {new Date(investment.created_at).toLocaleDateString()}
+                        </small>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`badge bg-${getTypeColor(investment.type)}`}>
+                        <i className={`${getTypeIcon(investment.type)} me-1`}></i>
+                        {investment.type}
+                      </span>
+                    </td>
+                    <td>
+                      {investment.symbol ? (
+                        <span className="badge bg-info">
+                          <i className="bi bi-graph-up me-1"></i>
+                          {investment.symbol}
+                        </span>
+                      ) : (
+                        <span className="text-muted">-</span>
+                      )}
+                    </td>
+                    <td className="text-end fw-semibold">{investment.qty}</td>
+                    <td className="text-end">₹{investment.purchase_value.toFixed(2)}</td>
+                    <td className="text-end fw-semibold">₹{investment.current_value.toFixed(2)}</td>
+                    <td className={`text-end fw-semibold ${isProfit ? 'text-success' : 'text-danger'}`}>
+                      {isProfit ? '+' : ''}₹{gainLoss.amount.toFixed(2)}
+                    </td>
+                    <td className={`text-end fw-semibold ${isProfit ? 'text-success' : 'text-danger'}`}>
+                      {isProfit ? '+' : ''}{gainLoss.percentage}%
+                    </td>
+                    <td className="text-center">
+                      <button
+                        className="btn btn-outline-danger btn-sm"
+                        onClick={() => handleDelete(investment.id)}
+                        title="Delete investment"
+                      >
+                        <i className="bi bi-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+
   useEffect(() => {
     load();
   }, []);
@@ -285,7 +452,39 @@ const InvestmentsPage = () => {
           <i className="bi bi-graph-up me-2 text-primary"></i>
           Investments
         </h1>
-        <div className="d-flex gap-2">
+        <div className="d-flex gap-2 align-items-center">
+          {/* View Toggle Switch */}
+          <div className="d-flex align-items-center me-3">
+            <span className="me-2 text-muted small">View:</span>
+            <div className="btn-group" role="group">
+              <input
+                type="radio"
+                className="btn-check"
+                name="viewMode"
+                id="tilesView"
+                checked={viewMode === 'tiles'}
+                onChange={() => setViewMode('tiles')}
+              />
+              <label className="btn btn-outline-secondary btn-sm" htmlFor="tilesView">
+                <i className="bi bi-grid-3x3-gap me-1"></i>
+                Tiles
+              </label>
+
+              <input
+                type="radio"
+                className="btn-check"
+                name="viewMode"
+                id="listView"
+                checked={viewMode === 'list'}
+                onChange={() => setViewMode('list')}
+              />
+              <label className="btn btn-outline-secondary btn-sm" htmlFor="listView">
+                <i className="bi bi-list-ul me-1"></i>
+                List
+              </label>
+            </div>
+          </div>
+
           {hasStocksWithSymbols && (
             <button
               className="btn btn-outline-success"
@@ -481,7 +680,7 @@ const InvestmentsPage = () => {
                     id="name"
                     value={formData.name}
                     onChange={e => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g., Apple Stock, Gold Coins, Tech Startup"
+                    placeholder="e.g., Reliance Stock, Gold Coins, Tech Startup"
                     required
                   />
                 </div>
@@ -609,92 +808,77 @@ const InvestmentsPage = () => {
           </div>
         </div>
       ) : (
-        <div className="row">
-          {investments.map((investment) => {
-            const gainLoss = calculateGainLoss(investment.current_value, investment.purchase_value);
-            const isProfit = gainLoss.amount >= 0;
-
-            return (
-              <div key={investment.id} className="col-md-6 col-lg-4 mb-4">
-                <div className="card h-100 shadow-sm">
-                  <div className="card-body">
-                    <div className="d-flex justify-content-between align-items-start mb-3">
-                      <div>
-                        <h5 className="card-title mb-1">{investment.name}</h5>
-                        <div className="d-flex gap-2 align-items-center">
-                          <span className={`badge bg-${getTypeColor(investment.type)}`}>
-                            <i className={`${getTypeIcon(investment.type)} me-1`}></i>
-                            {investment.type}
-                          </span>
-                          {investment.symbol && (
-                            <span className="badge bg-info">
-                              <i className="bi bi-graph-up me-1"></i>
-                              {investment.symbol}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        className="btn btn-outline-danger btn-sm"
-                        onClick={() => handleDelete(investment.id)}
-                        title="Delete investment"
-                      >
-                        <i className="bi bi-trash"></i>
-                      </button>
+        <>
+          {/* Summary Stats */}
+          <div className="row mb-4">
+            <div className="col-md-3">
+              <div className="card bg-primary text-white">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between">
+                    <div>
+                      <h6 className="card-title">Total Investments</h6>
+                      <h4 className="mb-0">{investments.length}</h4>
                     </div>
-
-                    <div className="mb-3">
-                      <div className="d-flex justify-content-between mb-2">
-                        <span className="text-muted">Quantity:</span>
-                        <span className="fw-bold">{investment.qty}</span>
-                      </div>
-                      <div className="d-flex justify-content-between mb-2">
-                        <span className="text-muted">Purchase Value:</span>
-                        <span className="fw-bold">₹{investment.purchase_value.toFixed(2)}</span>
-                      </div>
-                      <div className="d-flex justify-content-between mb-2">
-                        <span className="text-muted">Current Value:</span>
-                        <span className="fw-bold">₹{investment.current_value.toFixed(2)}</span>
-                      </div>
-                      <hr />
-                      <div className="d-flex justify-content-between">
-                        <span className="text-muted">Gain/Loss:</span>
-                        <div className="text-end">
-                          <div className={`fw-bold ${isProfit ? 'text-success' : 'text-danger'}`}>
-                            {isProfit ? '+' : ''}₹{gainLoss.amount.toFixed(2)}
-                          </div>
-                          <small className={isProfit ? 'text-success' : 'text-danger'}>
-                            ({isProfit ? '+' : ''}{gainLoss.percentage}%)
-                          </small>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="progress" style={{ height: '6px' }}>
-                      <div
-                        className={`progress-bar ${isProfit ? 'bg-success' : 'bg-danger'}`}
-                        style={{ width: `${Math.min(Math.abs(parseFloat(gainLoss.percentage)), 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                  <div className="card-footer text-muted">
-                    <small>
-                      <i className="bi bi-calendar me-1"></i>
-                      Added {new Date(investment.created_at).toLocaleDateString()}
-                      {investment.last_updated && (
-                        <>
-                          <br />
-                          <i className="bi bi-arrow-clockwise me-1"></i>
-                          Updated {new Date(investment.last_updated).toLocaleDateString()}
-                        </>
-                      )}
-                    </small>
+                    <i className="bi bi-graph-up" style={{ fontSize: '2rem', opacity: 0.7 }}></i>
                   </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
+            </div>
+            <div className="col-md-3">
+              <div className="card bg-success text-white">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between">
+                    <div>
+                      <h6 className="card-title">Total Value</h6>
+                      <h4 className="mb-0">₹{investments.reduce((sum, inv) => sum + inv.current_value, 0).toFixed(2)}</h4>
+                    </div>
+                    <i className="bi bi-currency-rupee" style={{ fontSize: '2rem', opacity: 0.7 }}></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="card bg-info text-white">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between">
+                    <div>
+                      <h6 className="card-title">Total Invested</h6>
+                      <h4 className="mb-0">₹{investments.reduce((sum, inv) => sum + inv.purchase_value, 0).toFixed(2)}</h4>
+                    </div>
+                    <i className="bi bi-wallet2" style={{ fontSize: '2rem', opacity: 0.7 }}></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className={`card text-white ${
+                investments.reduce((sum, inv) => sum + (inv.current_value - inv.purchase_value), 0) >= 0 
+                  ? 'bg-success' 
+                  : 'bg-danger'
+              }`}>
+                <div className="card-body">
+                  <div className="d-flex justify-content-between">
+                    <div>
+                      <h6 className="card-title">Total Gain/Loss</h6>
+                      <h4 className="mb-0">
+                        {investments.reduce((sum, inv) => sum + (inv.current_value - inv.purchase_value), 0) >= 0 ? '+' : ''}
+                        ₹{investments.reduce((sum, inv) => sum + (inv.current_value - inv.purchase_value), 0).toFixed(2)}
+                      </h4>
+                    </div>
+                    <i className={`bi ${
+                      investments.reduce((sum, inv) => sum + (inv.current_value - inv.purchase_value), 0) >= 0 
+                        ? 'bi-trending-up' 
+                        : 'bi-trending-down'
+                    }`} style={{ fontSize: '2rem', opacity: 0.7 }}></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Investments Display */}
+          {viewMode === 'tiles' ? renderTileView() : renderListView()}
+        </>
       )}
     </Layout>
   );
