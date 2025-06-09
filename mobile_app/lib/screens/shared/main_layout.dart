@@ -9,10 +9,10 @@ class MainLayout extends StatelessWidget {
   final int currentIndex;
 
   const MainLayout({
-    Key? key,
+    super.key,
     required this.child,
     required this.currentIndex,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

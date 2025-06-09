@@ -8,11 +8,11 @@ class InvestmentCard extends StatefulWidget {
   final Function(int) onDelete;
 
   const InvestmentCard({
-    Key? key,
+    super.key,
     required this.investment,
     required this.onEdit,
     required this.onDelete,
-  }) : super(key: key);
+  });
 
   @override
   State<InvestmentCard> createState() => _InvestmentCardState();

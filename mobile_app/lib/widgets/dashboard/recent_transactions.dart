@@ -8,10 +8,10 @@ class RecentTransactions extends StatelessWidget {
   final List<Expense> expenses;
 
   const RecentTransactions({
-    Key? key,
+    super.key,
     required this.incomes,
     required this.expenses,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +72,7 @@ class RecentTransactions extends StatelessWidget {
                     ),
                   ),
                 );
-              }).toList(),
+              }),
           ],
         ),
       ),

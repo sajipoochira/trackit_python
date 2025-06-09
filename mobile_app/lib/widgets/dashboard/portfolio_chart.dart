@@ -7,9 +7,9 @@ class PortfolioChart extends StatelessWidget {
   final List<Investment> investments;
 
   const PortfolioChart({
-    Key? key,
+    super.key,
     required this.investments,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -76,7 +76,7 @@ class PortfolioChart extends StatelessWidget {
                   ],
                 ),
               );
-            }).toList(),
+            }),
           ],
         ),
       ),

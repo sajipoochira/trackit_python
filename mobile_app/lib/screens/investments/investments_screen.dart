@@ -9,7 +9,7 @@ import '../../widgets/investments/investment_card.dart';
 import '../../widgets/investments/add_investment_form.dart';
 
 class InvestmentsScreen extends StatefulWidget {
-  const InvestmentsScreen({Key? key}) : super(key: key);
+  const InvestmentsScreen({super.key});
 
   @override
   State<InvestmentsScreen> createState() => _InvestmentsScreenState();

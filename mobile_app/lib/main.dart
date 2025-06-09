@@ -29,7 +29,7 @@ void main() async {
 class TrackItApp extends StatelessWidget {
   final SharedPreferences prefs;
 
-  const TrackItApp({Key? key, required this.prefs}) : super(key: key);
+  const TrackItApp({super.key, required this.prefs});
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +63,7 @@ class TrackItApp extends StatelessWidget {
       initialLocation: authProvider.isAuthenticated ? '/dashboard' : '/login',
       redirect: (context, state) {
         final isAuthenticated = authProvider.isAuthenticated;
-        final isLoginRoute = state.location == '/login';
+        final isLoginRoute = state.uri.toString() == '/login';
 
         if (!isAuthenticated && !isLoginRoute) {
           return '/login';

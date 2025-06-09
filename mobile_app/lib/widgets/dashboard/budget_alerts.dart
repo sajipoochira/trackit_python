@@ -5,9 +5,9 @@ class BudgetAlerts extends StatelessWidget {
   final Map<String, dynamic> budgetSummary;
 
   const BudgetAlerts({
-    Key? key,
+    super.key,
     required this.budgetSummary,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -96,7 +96,7 @@ class BudgetAlerts extends StatelessWidget {
                   ],
                 ),
               );
-            }).toList(),
+            }),
           ],
         ),
       ),
