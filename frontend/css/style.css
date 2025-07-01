@@ -1,0 +1,385 @@
+/* Custom CSS for TrackIt Finance Tracker */
+
+:root {
+    --primary-color: #2563EB;
+    --secondary-color: #10B981;
+    --success-color: #059669;
+    --danger-color: #DC2626;
+    --warning-color: #D97706;
+    --info-color: #0891B2;
+    --light-color: #F8FAFC;
+    --dark-color: #1E293B;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #F8FAFC;
+}
+
+/* Navigation */
+.navbar-brand {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.nav-link {
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.nav-link:hover {
+    transform: translateY(-1px);
+}
+
+/* Cards */
+.card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px 12px 0 0 !important;
+    border: none;
+}
+
+/* Summary Cards */
+.summary-card {
+    background: linear-gradient(135deg, var(--primary-color), #3B82F6);
+    color: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+}
+
+.summary-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.3);
+}
+
+.summary-card.success {
+    background: linear-gradient(135deg, var(--success-color), #10B981);
+}
+
+.summary-card.success:hover {
+    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+}
+
+.summary-card.danger {
+    background: linear-gradient(135deg, var(--danger-color), #EF4444);
+}
+
+.summary-card.danger:hover {
+    box-shadow: 0 8px 25px rgba(220, 38, 38, 0.3);
+}
+
+.summary-card.warning {
+    background: linear-gradient(135deg, var(--warning-color), #F59E0B);
+}
+
+.summary-card.warning:hover {
+    box-shadow: 0 8px 25px rgba(217, 119, 6, 0.3);
+}
+
+.summary-card.info {
+    background: linear-gradient(135deg, var(--info-color), #06B6D4);
+}
+
+.summary-card.info:hover {
+    box-shadow: 0 8px 25px rgba(8, 145, 178, 0.3);
+}
+
+/* Investment Cards */
+.investment-card {
+    border-left: 4px solid var(--primary-color);
+    transition: all 0.3s ease;
+}
+
+.investment-card:hover {
+    border-left-color: var(--secondary-color);
+    transform: translateX(5px);
+}
+
+.investment-card.profit {
+    border-left-color: var(--success-color);
+}
+
+.investment-card.loss {
+    border-left-color: var(--danger-color);
+}
+
+/* Progress Bars */
+.progress {
+    height: 8px;
+    border-radius: 4px;
+    background-color: #E5E7EB;
+}
+
+.progress-bar {
+    border-radius: 4px;
+    transition: width 0.6s ease;
+}
+
+/* Buttons */
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color), #3B82F6);
+    border: none;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, var(--success-color), #10B981);
+    border: none;
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, var(--danger-color), #EF4444);
+    border: none;
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, var(--warning-color), #F59E0B);
+    border: none;
+}
+
+.btn-info {
+    background: linear-gradient(135deg, var(--info-color), #06B6D4);
+    border: none;
+}
+
+/* Forms */
+.form-control, .form-select {
+    border-radius: 8px;
+    border: 2px solid #E5E7EB;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.25);
+}
+
+/* Modals */
+.modal-content {
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+    border-radius: 12px 12px 0 0;
+    background: linear-gradient(135deg, var(--primary-color), #3B82F6);
+    color: white;
+    border: none;
+}
+
+.modal-footer {
+    border: none;
+    padding-top: 0;
+}
+
+/* Tables */
+.table {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.table thead th {
+    background-color: #F8FAFC;
+    border: none;
+    font-weight: 600;
+    color: var(--dark-color);
+}
+
+.table tbody tr {
+    transition: all 0.3s ease;
+}
+
+.table tbody tr:hover {
+    background-color: #F1F5F9;
+    transform: scale(1.01);
+}
+
+/* Badges */
+.badge {
+    font-weight: 500;
+    padding: 0.5em 0.75em;
+    border-radius: 6px;
+}
+
+/* Loading Spinner */
+.spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.slide-in {
+    animation: slideIn 0.5s ease-out;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .summary-card {
+        margin-bottom: 1rem;
+    }
+    
+    .card {
+        margin-bottom: 1rem;
+    }
+    
+    .btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+}
+
+/* Chart Container */
+.chart-container {
+    position: relative;
+    height: 300px;
+    margin: 1rem 0;
+}
+
+/* Status Indicators */
+.status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.status-active {
+    background-color: var(--success-color);
+}
+
+.status-warning {
+    background-color: var(--warning-color);
+}
+
+.status-danger {
+    background-color: var(--danger-color);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #F1F5F9;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94A3B8;
+}
+
+/* Utility Classes */
+.text-gradient {
+    background: linear-gradient(135deg, var(--primary-color), #3B82F6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.shadow-custom {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.border-gradient {
+    border: 2px solid;
+    border-image: linear-gradient(135deg, var(--primary-color), #3B82F6) 1;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: #0F172A;
+        color: #F1F5F9;
+    }
+    
+    .card {
+        background-color: #1E293B;
+        color: #F1F5F9;
+    }
+    
+    .table {
+        color: #F1F5F9;
+    }
+    
+    .table thead th {
+        background-color: #334155;
+        color: #F1F5F9;
+    }
+    
+    .table tbody tr:hover {
+        background-color: #334155;
+    }
+    
+    .form-control, .form-select {
+        background-color: #334155;
+        border-color: #475569;
+        color: #F1F5F9;
+    }
+    
+    .modal-content {
+        background-color: #1E293B;
+        color: #F1F5F9;
+    }
+}
