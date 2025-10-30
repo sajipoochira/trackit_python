@@ -6,6 +6,7 @@ import BulkCreateCard from '../components/BulkCreateCard.jsx'
 import { parseCSV } from '../utils/csv.js'
 import { coerceTypesWithOverrides } from '../utils/bulk.js'
 import { formatCellValue } from '../utils/format.js'
+import { convert as convertFx, getPreferredCurrency, setPreferredCurrency, subscribe as subscribeRates } from '../ratesStore.js'
 
 export default function Investments() {
   const [items, setItems] = useState([])
@@ -156,6 +157,7 @@ export default function Investments() {
           )}
         </div>
       </div>
+      <StocksAccumulatedCard items={items} />
     </div>
   )
 }
@@ -218,4 +220,146 @@ function getColumns(items, cfg){
 
 function labelize(name){
   return String(name).replace(/_/g,' ').replace(/\b\w/g,m=>m.toUpperCase())
+}
+
+function StocksAccumulatedCard({ items = [] }){
+  const [pref, setPref] = useState(getPreferredCurrency())
+  useEffect(() => {
+    const unsub = subscribeRates(() => setPref(getPreferredCurrency()))
+    return () => { try { unsub && unsub() } catch(_){} }
+  }, [])
+
+  const stocks = useMemo(() => (items || []).filter(x => (String(x.category || '')).toLowerCase() === 'stocks'), [items])
+
+  const perSymbol = useMemo(() => {
+    const map = new Map()
+    stocks.forEach(x => {
+      const sym = x.symbol || x.name || 'UNKNOWN'
+      const qty = Number(x.quantity) || 0
+      const price = Number(x.buy_price) || 0
+      const cur = String(x.currency || 'INR').toUpperCase()
+      const costNative = qty * price
+      const cost = cur === pref ? costNative : (convertFx(costNative, cur, pref) || costNative)
+      const row = map.get(sym) || { symbol: sym, name: x.name || sym, qty: 0, cost: 0, currency: pref }
+      row.qty += qty
+      row.cost += cost
+      map.set(sym, row)
+    })
+    return Array.from(map.values()).filter(r => r.qty > 0)
+  }, [stocks, pref])
+
+  const [quotes, setQuotes] = useState({})
+  const [qLoading, setQLoading] = useState(false)
+
+  const loadQuotes = async (symbols) => {
+    if (!symbols || symbols.length === 0) { setQuotes({}); return }
+    setQLoading(true)
+    try {
+      const results = await Promise.all(symbols.map(s => api.getLatestQuote(s).catch(() => null)))
+      const q = {}
+      results.forEach((res, idx) => { if (res && symbols[idx]) q[symbols[idx]] = res.currentPrice || {} })
+      setQuotes(q)
+    } finally { setQLoading(false) }
+  }
+
+  useEffect(() => {
+    const syms = Array.from(new Set(perSymbol.map(r => (r.symbol || '').toUpperCase()).filter(Boolean)))
+    loadQuotes(syms)
+  }, [perSymbol])
+
+  const refreshNow = async () => {
+    const syms = Array.from(new Set(perSymbol.map(r => (r.symbol || '').toUpperCase()).filter(Boolean)))
+    if (!syms.length) return
+    setQLoading(true)
+    try {
+      await Promise.all(syms.map(s => api.getLtp(s).catch(() => null)))
+      await loadQuotes(syms)
+    } finally { setQLoading(false) }
+  }
+
+  const rows = useMemo(() => perSymbol.map(r => {
+    const sym = String(r.symbol || '').toUpperCase()
+    const qp = quotes[sym]
+    const ltpInInr = qp ? Number(qp.NSE || qp.BSE) : NaN
+    const ltp = (pref === 'INR') ? ltpInInr : (convertFx(ltpInInr, 'INR', pref) || NaN)
+    const current = Number.isFinite(ltp) ? (ltp * (Number(r.qty) || 0)) : null
+    return { ...r, ltp, current }
+  }), [perSymbol, quotes, pref])
+
+  const totals = useMemo(() => {
+    const totalCost = rows.reduce((s, r) => s + (Number(r.cost) || 0), 0)
+    const totalCurr = rows.reduce((s, r) => s + (Number(r.current) || 0), 0)
+    return { totalCost, totalCurr, pnl: totalCurr - totalCost }
+  }, [rows])
+
+  const setCurrency = (c) => { try { setPreferredCurrency(c); setPref(c) } catch(_){} }
+
+  return (
+    <div className="card mb-3">
+      <div className="card-header d-flex align-items-center justify-content-between">
+        <strong>Stocks Summary (Accumulated)</strong>
+        <div className="d-flex align-items-center gap-2">
+          <div className="btn-group btn-group-sm" role="group">
+            <button className={`btn btn-outline-secondary ${pref==='INR'?'active':''}`} onClick={()=>setCurrency('INR')}>INR</button>
+            <button className={`btn btn-outline-secondary ${pref==='QAR'?'active':''}`} onClick={()=>setCurrency('QAR')}>QAR</button>
+          </div>
+          <button className="btn btn-sm btn-outline-primary" onClick={refreshNow} disabled={qLoading}>{qLoading ? 'Refreshing…' : 'Refresh Prices'}</button>
+        </div>
+      </div>
+      <div className="card-body">
+        {rows.length === 0 ? (
+          <div className="text-muted">No stock investments</div>
+        ) : (
+          <div className="table-responsive">
+            <table className="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Symbol</th>
+                  <th>Type</th>
+                  <th className="text-end">Qty</th>
+                  <th className="text-end">Current value ({pref})</th>
+                  <th className="text-end">Purchase value ({pref})</th>
+                  <th>Currency</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={r.symbol || i}>
+                    <td>{r.name || r.symbol}</td>
+                    <td>{r.symbol}</td>
+                    <td>Stocks</td>
+                    <td className="text-end">{Number(r.qty) || 0}</td>
+                    <td className="text-end">{r.current != null ? r.current.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'}</td>
+                    <td className="text-end">{Number(r.cost || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                    <td>{pref}</td>
+                    <td>
+                      <button className="btn btn-sm btn-outline-secondary" onClick={async ()=>{ setQLoading(true); try { await api.getLtp(r.symbol); await loadQuotes([r.symbol]); } finally { setQLoading(false) }}} disabled={qLoading}>Refresh</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan="4" className="text-end fw-semibold">Totals</td>
+                  <td className="text-end fw-semibold">{totals.totalCurr.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                  <td className="text-end fw-semibold">{totals.totalCost.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                  <td>{pref}</td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td colSpan="7" className="text-end">Profit / Loss ({pref})</td>
+                  <td className="text-end fw-semibold">{totals.pnl.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                </tr>
+              </tfoot>
+            </table>
+            <StocksAccumulatedCard items={items} />
+    </div>
+  )
+}
+      </div>
+      <StocksAccumulatedCard items={items} />
+    </div>
+  )
 }
