@@ -4,6 +4,7 @@ class ApiService {
     constructor() {
         this.baseURL = 'http://localhost:8000/api';
         this.token = localStorage.getItem('access_token');
+        this.refreshTokenValue = localStorage.getItem('refresh_token');
     }
 
     // Get headers with authentication
@@ -20,7 +21,7 @@ class ApiService {
     }
 
     // Generic API request method
-    async request(endpoint, options = {}) {
+    async request(endpoint, options = {}, _retried = false) {
         const url = `${this.baseURL}${endpoint}`;
         const config = {
             headers: this.getHeaders(),
@@ -29,22 +30,25 @@ class ApiService {
 
         try {
             const response = await fetch(url, config);
-            
-            if (response.status === 401) {
-                // Token expired, redirect to login
+
+            if (response.status === 401 && !_retried && this.refreshTokenValue) {
+                const refreshed = await this.refreshToken();
+                if (refreshed) {
+                    return this.request(endpoint, options, true);
+                }
                 this.logout();
                 return null;
             }
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             const contentType = response.headers.get('content-type');
             if (contentType && contentType.includes('application/json')) {
                 return await response.json();
             }
-            
+
             return response;
         } catch (error) {
             console.error('API request failed:', error);
@@ -67,19 +71,87 @@ class ApiService {
             this.token = data.access;
             localStorage.setItem('access_token', data.access);
             if (data.refresh) {
+                this.refreshTokenValue = data.refresh;
                 localStorage.setItem('refresh_token', data.refresh);
             }
             return data;
         } else {
-            throw new Error('Login failed');
+            try {
+                const text = await response.text();
+                let msg = 'Login failed';
+                if (text) {
+                    try {
+                        const json = JSON.parse(text);
+                        msg = json.detail || json.message || msg;
+                    } catch (_) {
+                        msg = text;
+                    }
+                }
+                throw new Error(msg);
+            } catch (e) {
+                throw new Error(e.message || 'Login failed');
+            }
         }
     }
 
     logout() {
         this.token = null;
+        this.refreshTokenValue = null;
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
-        window.location.reload();
+        try {
+            if (typeof showLoginScreen === 'function') {
+                showLoginScreen();
+            } else {
+                // Fallback if UI helper not loaded
+                window.location.hash = '#login';
+            }
+        } catch (_) {
+            // Last resort
+            // Avoid tight reload loops that could cause stack issues
+            setTimeout(() => window.location.reload(), 50);
+        }
+    }
+
+    async refreshToken() {
+        if (!this.refreshTokenValue) return false;
+        try {
+            const response = await fetch(`${this.baseURL}/token/refresh/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh: this.refreshTokenValue })
+            });
+            if (!response.ok) return false;
+            const data = await response.json();
+            if (data.access) {
+                this.token = data.access;
+                localStorage.setItem('access_token', data.access);
+                return true;
+            }
+            return false;
+        } catch (e) {
+            console.error('Token refresh failed', e);
+            return false;
+        }
+    }
+
+    // Auth helpers
+    async getCurrentUser() {
+        return this.request('/auth/me/');
+    }
+
+    async register(username, password, email = '') {
+        return fetch(`${this.baseURL}/auth/register/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password, email })
+        }).then(async (res) => {
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(`Registration failed: ${text}`);
+            }
+            return res.json();
+        });
     }
 
     // Investments

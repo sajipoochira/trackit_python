@@ -6,6 +6,7 @@ from finance.views import (
     AssetViewSet, ExchangeRateViewSet, LTPViewSet, BudgetViewSet, LiabilityViewSet, MoneyLentViewSet
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from users.views import RegisterView, CurrentUserView
 
 router = DefaultRouter()
 router.register(r'investments', InvestmentViewSet)
@@ -22,5 +23,7 @@ urlpatterns = [
     path('api/', include(router.urls)),
     path('api/token/', TokenObtainPairView.as_view()),
     path('api/token/refresh/', TokenRefreshView.as_view()),
+    path('api/auth/register/', RegisterView.as_view()),
+    path('api/auth/me/', CurrentUserView.as_view()),
     path('admin/', admin.site.urls),
 ]

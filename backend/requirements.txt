@@ -9,3 +9,5 @@ python-dotenv
 supabase
 dj-database-url
 nsetools
+requests
+APScheduler

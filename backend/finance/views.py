@@ -1,5 +1,5 @@
 from rest_framework import viewsets, permissions, status
-from .models import Investment, Income, Expense, Asset, ExchangeRate, Budget, Liability, MoneyLent
+from .models import Investment, Income, Expense, Asset, ExchangeRate, Budget, Liability, MoneyLent, StockQuote
 from .serializers import (
     InvestmentSerializer, IncomeSerializer, ExpenseSerializer, 
     AssetSerializer, ExchangeRateSerializer, LTPResponseSerializer, BudgetSerializer, LiabilitySerializer, MoneyLentSerializer
@@ -12,6 +12,8 @@ from nsetools import Nse
 from datetime import datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
 import logging
+import os
+import requests
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -655,28 +657,73 @@ class LTPViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'])
     def get_price(self, request):
-        symbol = request.query_params.get('symbol')
+        symbol = request.query_params.get('symbol') or request.query_params.get('name')
         if not symbol:
-            return Response({'error': 'Symbol parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response({'error': 'symbol (or name) query param is required'}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
-            logger.debug(f"Fetching price for symbol: {symbol}")
-            nse = Nse()
+            # Prefer Indian API for currentPrice (BSE/NSE)
+            base_url = os.environ.get('INDIANAPI_BASE_URL', 'https://stock.indianapi.in')
+            api_key = os.environ.get('INDIANAPI_KEY')
+
+            url = f"{base_url}/stock?name={symbol}"
+            headers = {}
+            if api_key:
+                # Try common auth styles — backend will accept either
+                
+                headers['x-api-key'] = api_key
+
+            logger.debug(f"Fetching currentPrice from Indian API for {symbol}")
+            resp = requests.get(url, headers=headers, timeout=15)
+            if resp.status_code != 200:
+                return Response({'error': f'Upstream error: {resp.status_code}'}, status=status.HTTP_502_BAD_GATEWAY)
+
+            data = resp.json() if resp.content else {}
             
-            # Try to get quote for the symbol
-            stock_data = nse.get_quote(symbol.upper())
+            current_price = (data or {}).get('currentPrice') or {}
+            bse = current_price.get('BSE')
+            nse = current_price.get('NSE')
             
-            if not stock_data:
-                return Response({'error': f'Stock data not found for symbol: {symbol}'}, status=status.HTTP_404_NOT_FOUND)
-            
-            ltp = stock_data.get('lastPrice')
-            print("LTP fro the Stock {symbol} : {ltp}")
-            if ltp is None:
-                return Response({'error': f'Last price not available for symbol: {symbol}'}, status=status.HTTP_404_NOT_FOUND)
-            
-            logger.debug(f"Successfully fetched LTP for {symbol}: {ltp}")
-            return Response({'symbol': symbol, 'ltp': ltp}, status=status.HTTP_200_OK)
-            
+
+            if not bse and not nse:
+                return Response({'error': 'currentPrice not available from upstream'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Cache/update in DB
+            company_name = (data or {}).get('companyName')
+            sq, _ = StockQuote.objects.update_or_create(
+                symbol=symbol.upper(),
+                defaults={
+                    'company_name': company_name,
+                    'bse_price': bse,
+                    'nse_price': nse,
+                }
+            )
+
+            return Response({
+                'symbol': symbol.upper(),
+                'companyName': company_name,
+                'currentPrice': {
+                    'BSE': sq.bse_price,
+                    'NSE': sq.nse_price
+                },
+                'updatedAt': sq.updated_at
+            }, status=status.HTTP_200_OK)
+
         except Exception as e:
             logger.error(f"Error fetching price for {symbol}: {str(e)}")
             return Response({'error': f'Failed to fetch price for {symbol}: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['get'])
+    def latest(self, request):
+        symbol = request.query_params.get('symbol')
+        if not symbol:
+            return Response({'error': 'symbol is required'}, status=status.HTTP_400_BAD_REQUEST)
+        sq = StockQuote.objects.filter(symbol=symbol.upper()).first()
+        if not sq:
+            return Response({'error': 'No cached quote'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({
+            'symbol': sq.symbol,
+            'companyName': sq.company_name,
+            'currentPrice': {'BSE': sq.bse_price, 'NSE': sq.nse_price},
+            'updatedAt': sq.updated_at
+        })

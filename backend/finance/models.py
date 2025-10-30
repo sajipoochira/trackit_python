@@ -2,6 +2,16 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 
+class StockQuote(models.Model):
+    symbol = models.CharField(max_length=50, unique=True)
+    company_name = models.CharField(max_length=255, blank=True, null=True)
+    bse_price = models.CharField(max_length=32, blank=True, null=True)
+    nse_price = models.CharField(max_length=32, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.symbol}: BSE={self.bse_price} NSE={self.nse_price}"
+
 class ExchangeRate(models.Model):
     from_currency = models.CharField(max_length=10)
     to_currency = models.CharField(max_length=10)
@@ -55,7 +65,7 @@ class Income(models.Model):
     ]
     
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    source = models.CharField(max_length=255)
+    source = models.CharField(max_length=255, default='broker withdrawal')
     category = models.CharField(max_length=50, choices=INCOME_CATEGORIES, default='other')
     amount = models.FloatField()
     currency = models.CharField(max_length=10, choices=CURRENCY_CHOICES, default='INR')
