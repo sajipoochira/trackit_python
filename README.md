@@ -1,187 +1,124 @@
 # TrackIt - Personal Finance Tracker
 
-A full-stack personal finance tracking application built with Django REST Framework and React, using Supabase as the database.
+Full‑stack personal finance tracker with Django REST API and a React frontend. Includes holdings, income, expenses, liabilities, and live stock quotes for Indian markets.
 
-## Features
+## Highlights
 
-- **Investment Tracking**: Track stocks, bonds, mutual funds, ETFs, cryptocurrency, real estate, gold, business investments, and more
-- **Real-time Stock Prices**: Automatic price updates for Indian stocks using NSEtools
-- **Bulk Upload**: CSV import functionality for adding multiple investments at once
-- **Income & Expense Tracking**: (Coming soon)
-- **Asset Management**: (Coming soon)
+- Investment tracking: stocks, funds, crypto, real estate, gold, business, more
+- Live stock quotes: BSE/NSE via Indian API (stock.indianapi.in)
+- Auto-refresh quotes: hourly, Mon–Fri, 08:00–14:00 (server time)
+- On‑demand price refresh from the UI
+- Current Stock Holdings view: Qty, Avg Cost, Total Cost, LTP, Current Value, and overall totals incl. Profit/Loss
+- JWT auth; CORS enabled for local dev
 
 ## Tech Stack
 
-- **Backend**: Django REST Framework, PostgreSQL (via Supabase)
-- **Frontend**: React, TypeScript, Bootstrap 5
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: JWT tokens
-- **Stock API**: NSEtools (for Indian stock market data)
+- Backend: Django REST Framework
+- Frontend: React (Vite) + Bootstrap 5 (folder: `frontend-react`)
+- Database: SQLite by default (Supabase/PostgreSQL optional)
+- Auth: JWT
+- Quotes: Indian API (BSE/NSE) + server‑side cache
 
-## Setup Instructions
+## Setup
 
-### 1. Supabase Setup
+### Backend
 
-1. Go to [Supabase](https://supabase.com) and create a new project
-2. Once your project is created, go to Settings > API
-3. Copy your project URL and API keys
+1) Create `backend/.env` (example):
 
-### 2. Environment Variables
-
-Create the following environment files:
-
-**backend/.env**:
 ```env
-# Supabase Configuration
-SUPABASE_URL=https://your-project-ref.supabase.co
-SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-
-# Database URL (get this from Supabase Settings > Database)
-DATABASE_URL=postgresql://postgres:[YOUR_PASSWORD]@db.[YOUR_PROJECT_REF].supabase.co:5432/postgres
-
-# Django Configuration
-DJANGO_SECRET_KEY=your-secret-key-for-development
+DJANGO_SECRET_KEY=your-secret-key
 DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
 CORS_ALLOWED_ORIGINS=http://localhost:5173
+
+# Optional: use Postgres via Supabase
+# DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
+
+# Indian API for quotes
+INDIANAPI_BASE_URL=https://stock.indianapi.in
+INDIANAPI_KEY=YOUR_LIVE_API_KEY
 ```
 
-**frontend/.env**:
-```env
-# Supabase Configuration
-VITE_SUPABASE_URL=https://your-project-ref.supabase.co
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+2) Install and run:
 
-# API Configuration
-VITE_API_URL=http://localhost:8000
-```
-
-### 3. Getting Supabase Database URL
-
-1. In your Supabase dashboard, go to Settings > Database
-2. Scroll down to "Connection string" section
-3. Copy the URI and replace `[YOUR-PASSWORD]` with your actual database password
-4. Use this as your `DATABASE_URL` in the backend `.env` file
-
-### 4. Running the Application
-
-#### Using Docker (Recommended)
 ```bash
-docker-compose up --build
-```
-
-#### Manual Setup
-```bash
-# Backend
 cd backend
-pip install -r requirements.txt
-python manage.py makemigrations
+pip install -r requirements.txt  # includes requests and APScheduler
+python manage.py makemigrations finance
 python manage.py migrate
-python manage.py createsuperuser  # Create admin user
 python manage.py runserver
+```
 
-# Frontend (in another terminal)
-cd frontend
+### Frontend (React)
+
+```bash
+cd frontend-react
 npm install
 npm run dev
 ```
 
-### 5. Create Admin User
+Environment (optional): `frontend-react/.env`
 
-```bash
-cd backend
-python manage.py createsuperuser
+```env
+VITE_API_BASE=http://localhost:8000/api
 ```
 
-### 6. Access the Application
+### Access
 
 - Frontend: http://localhost:5173
-- Backend API: http://localhost:8000
-- Django Admin: http://localhost:8000/admin
+- API: http://localhost:8000/api
+- Admin: http://localhost:8000/admin
 
-## Stock Price Updates
+## Quotes: How It Works
 
-The application uses NSEtools to fetch real-time stock prices from the Indian stock market (NSE). This requires no authentication and works out of the box.
+- Endpoint: `GET /api/ltp/get_price/?symbol=EKC` fetches from Indian API and caches BSE/NSE in DB.
+- Endpoint: `GET /api/ltp/latest/?symbol=EKC` returns last cached quote.
+- Scheduler (APScheduler) refreshes distinct `Investment.symbol` hourly Mon–Fri between 08:00 and 14:00.
+- Frontend holdings page includes a “Refresh Prices” button for on‑demand updates.
 
-### Supported Stock Symbols
+Response shape returned to the client (example):
 
-Use NSE stock symbols for Indian stocks:
-- **Reliance**: RELIANCE
-- **TCS**: TCS
-- **Infosys**: INFY
-- **HDFC Bank**: HDFCBANK
-- **ITC**: ITC
-- **Bharti Airtel**: BHARTIARTL
-
-### How to Use:
-
-1. **Add stocks with NSE symbols** when creating investments
-2. **Click "Refresh Prices"** to update all stock prices automatically
-3. **The system will fetch current prices** and update your investment values
-
-## API Endpoints
-
-- `POST /api/token/` - Login
-- `POST /api/token/refresh/` - Refresh token
-- `GET/POST /api/investments/` - List/Create investments
-- `GET/PUT/DELETE /api/investments/{id}/` - Retrieve/Update/Delete investment
-- `GET /api/ltp/get_price/?symbol=SYMBOL` - Get live stock price
-
-## CSV Upload Format
-
-For bulk investment upload, use this CSV format:
-
-```csv
-name,symbol,type,qty,purchase_value,current_value
-Reliance Stock,RELIANCE,Stock,10,2500.00,2750.50
-Gold Investment,,Gold,5,1800.00,1950.00
-Tech Startup,,Business,1,10000.00,12500.00
+```json
+{
+  "symbol": "EKC",
+  "companyName": "Everest Kanto Cylinder",
+  "currentPrice": { "BSE": "146.25", "NSE": "146.96" },
+  "updatedAt": "2025-10-30T06:34:23Z"
+}
 ```
 
-## Investment Types Supported
+## Current Stock Holdings
 
-- Stock
-- Bond
-- Mutual Fund
-- ETF
-- Cryptocurrency
-- Real Estate
-- Gold
-- Business
-- Other
+- Columns: Symbol, Name, Qty, Avg Cost (INR), Total Cost (INR), LTP (INR), Current Value (INR)
+- Footer totals:
+  - Total Cost (sum of cost)
+  - Total Current Value (sum of qty × LTP)
+  - Profit/Loss (Current Value − Total Cost)
+
+## API Overview
+
+- Auth
+  - `POST /api/token/` (username, password)
+  - `POST /api/token/refresh/`
+- Core resources
+  - `GET/POST /api/investments/`
+  - `GET/PUT/DELETE /api/investments/{id}/`
+  - `GET/POST /api/expenses/`, `/api/incomes/`, `/api/assets/`, `/api/liabilities/` …
+- Quotes
+  - `GET /api/ltp/get_price/?symbol=SYMBOL` — fetch + cache from upstream
+  - `GET /api/ltp/latest/?symbol=SYMBOL` — read cached
 
 ## Troubleshooting
 
-### Stock Price Issues
-
-1. **"Stock data not found for symbol"**:
-   - Ensure you're using correct NSE symbols
-   - Check if the stock is actively traded on NSE
-   - Verify the symbol spelling
-
-2. **"Last price not available"**:
-   - The stock might be suspended or not trading
-   - Try during market hours (9:15 AM - 3:30 PM IST)
-
-3. **Network errors**:
-   - Check your internet connection
-   - NSE servers might be temporarily unavailable
-
-### Database Issues
-
-1. **Connection errors**:
-   - Verify your Supabase DATABASE_URL is correct
-   - Check if your Supabase project is active
-
-2. **Migration errors**:
-   - Run `python manage.py makemigrations` and `python manage.py migrate`
-   - Ensure database permissions are correct
+- 401 from API calls
+  - Ensure JWT tokens are present; login via `/api/token/`.
+- Quotes not updating
+  - Verify `INDIANAPI_KEY` in `backend/.env` and restart backend.
+  - Use the “Refresh Prices” button; check server logs for upstream errors.
+- Migrations missing
+  - Run `python manage.py makemigrations finance && python manage.py migrate` (adds StockQuote model).
 
 ## Notes
 
-- Stock symbols should be NSE symbols for Indian stocks
-- Stock price updates work during market hours for best results
-- All monetary values are in INR (Indian Rupees)
-- The application uses JWT authentication for API access
-- NSEtools provides free access to Indian stock market data
+- Symbols should match what Indian API expects in the `name`/`symbol` query.
+- Scheduler runs in‑process; for multi‑worker deployments consider an external scheduler.
