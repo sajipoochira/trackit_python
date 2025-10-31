@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from './context/AuthContext.jsx'
 import Login from './pages/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Investments from './pages/Investments.jsx'
+import GoldInvestments from './pages/GoldInvestments.jsx'
+import BusinessInvestments from './pages/BusinessInvestments.jsx'
 import Income from './pages/Income.jsx'
 import Expenses from './pages/Expenses.jsx'
 import Assets from './pages/Assets.jsx'
@@ -52,6 +54,8 @@ function AppShell() {
             }
           />
           <Route path="/investments" element={<ProtectedRoute><Investments /></ProtectedRoute>} />
+          <Route path="/gold" element={<ProtectedRoute><GoldInvestments /></ProtectedRoute>} />
+          <Route path="/business" element={<ProtectedRoute><BusinessInvestments /></ProtectedRoute>} />
           <Route path="/income" element={<ProtectedRoute><Income /></ProtectedRoute>} />
           <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
           <Route path="/assets" element={<ProtectedRoute><Assets /></ProtectedRoute>} />

@@ -8,6 +8,21 @@
 /frontend/.env.*
 
 # ====================
+# React (Vite) frontend – alternative app
+# ====================
+/frontend-react/node_modules/
+/frontend-react/dist/
+/frontend-react/.vite/
+/frontend-react/.env
+/frontend-react/.env.*
+/frontend-react/.env.local
+/frontend-react/.env.*.local
+/frontend-react/.DS_Store
+/frontend-react/npm-debug.log*
+/frontend-react/yarn-debug.log*
+/frontend-react/pnpm-debug.log*
+
+# ====================
 # Django backend
 # ====================
 /backend/__pycache__/
@@ -18,6 +33,7 @@
 !/backend/**/migrations/__init__.py
 /backend/.env
 /backend/.env.*
+/backend/staticfiles/
 
 # ====================
 # Flutter mobile app
@@ -59,6 +75,26 @@
 .history
 .svn/
 .swiftpm/
+
+# Python tooling caches and virtualenvs (global)
+**/__pycache__/
+.Python
+.venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+coverage.xml
+pip-wheel-metadata/
+
+# Node logs (global)
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
 
 # ====================
 # IntelliJ related (applies globally)

@@ -392,8 +392,14 @@ function formatCurrency(amount, currency = 'INR') {
 }
 
 function formatDate(dateString) {
+    if (!dateString) return '-';
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN');
+    if (isNaN(date.getTime())) return '-';
+    try {
+        return date.toLocaleDateString('en-IN');
+    } catch (_) {
+        return '-';
+    }
 }
 
 function showLoading() {
