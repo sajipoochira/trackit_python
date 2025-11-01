@@ -12,6 +12,7 @@ import Assets from './pages/Assets.jsx'
 import Liabilities from './pages/Liabilities.jsx'
 import BulkImport from './pages/BulkImport.jsx'
 import StockInvestments from './pages/StockInvestments.jsx'
+import Reports from './pages/Reports.jsx'
 import NavBar from './components/NavBar.jsx'
 import ContextActions from './components/ContextActions.jsx'
 
@@ -61,6 +62,7 @@ function AppShell() {
           <Route path="/assets" element={<ProtectedRoute><Assets /></ProtectedRoute>} />
           <Route path="/liabilities" element={<ProtectedRoute><Liabilities /></ProtectedRoute>} />
           <Route path="/stocks" element={<ProtectedRoute><StockInvestments /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/bulk" element={<ProtectedRoute><BulkImport /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to={isAuthenticated ? '/' : '/login'} replace />} />
         </Routes>

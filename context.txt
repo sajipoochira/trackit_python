@@ -79,8 +79,8 @@ Views and API Endpoints (backend/finance/views.py, backend/trackit_backend/urls.
   - `GET /api/exchange-rates/current_rates/` – maps of configured pairs with timestamps
   - `POST /api/exchange-rates/update_rate/` – upsert a pair’s rate
 - Live Quotes (LTP):
-  - `GET /api/ltp/get_price/?symbol=SYMBOL` – fetch from Indian API and cache (`StockQuote`), open to all (`AllowAny`)
-  - `GET /api/ltp/latest/?symbol=SYMBOL` – return last cached price if present
+  - `GET /api/ltp/get_price/?symbol=SYMBOL` - fetch from Indian API and cache (`StockQuote`), open to all (`AllowAny`). Response also includes unified fields: `ltp`, `currency` (INR), `as_of`, `source`, in addition to `currentPrice`.
+  - `GET /api/ltp/latest/?symbol=SYMBOL` - return last cached price with the same unified fields
 
 Scheduler (backend/finance/apps.py)
 - APScheduler background job runs hourly on weekdays 08:00–14:00 (server time) to refresh quotes for distinct `Investment.symbol` values using the Indian API, storing to `StockQuote`.
@@ -94,7 +94,7 @@ Backend Runtime/Container
 - `backend/Dockerfile`: Python 3.10 slim; installs `requirements.txt`; default command runs migrations then serves via Gunicorn on `0.0.0.0:8000`.
 - `docker-compose.yml`:
   - `web`: builds `./backend`, mounts source, exposes 8000; uses env from `backend/.env`.
-  - `frontend`: builds `./frontend`, runs `npm run dev` on `0.0.0.0:5173`, depends on `web`. Note: ensure a `frontend/Dockerfile` exists or specify a proper image/context in Compose.
+  - Frontend service removed to avoid confusion; run the React app locally via Vite (`frontend-react`).
 
 Frontend (Static HTML/JS in `frontend`)
 - Entry: `frontend/index.html:1` using Bootstrap 5, Bootstrap Icons, and Chart.js.
@@ -110,6 +110,28 @@ Frontend (Static HTML/JS in `frontend`)
 Frontend (React in `frontend-react`)
 - Alternative React + Vite app with Bootstrap; `VITE_API_BASE` env can point to the backend (default `http://localhost:8000/api`).
 - Not required to run the static `frontend` app but available if you prefer React.
+- Pages and routes (React):
+  - `Dashboard` → `/`
+  - `Investments` (summary for Stocks/Gold/Business) → `/investments` (file: `frontend-react/src/pages/Investments.jsx`)
+  - `Stocks` (detailed equities tooling and quotes) → `/stocks` (file: `frontend-react/src/pages/StockInvestments.jsx`)
+  - `Gold Investments` → `/gold` (file: `frontend-react/src/pages/GoldInvestments.jsx`)
+  - `Business Investments` → `/business` (file: `frontend-react/src/pages/BusinessInvestments.jsx`)
+  - `Income` → `/income`, `Expenses` → `/expenses`, `Assets` → `/assets`, `Liabilities` → `/liabilities`, `Bulk Import` → `/bulk`
+- Navigation updated in `frontend-react/src/components/NavBar.jsx` to include Investments, Stocks, Gold, Business.
+- Routes wired in `frontend-react/src/App.jsx` to include the above.
+  - Reports page `/reports` (file: `frontend-react/src/pages/Reports.jsx`) with snapshot, cashflow, and timeline. Includes inline mini bar charts (no external chart libs required).
+
+Reports
+- New endpoints:
+  - `GET /api/reports/net_worth/` – totals (assets, investments, money lent, liabilities) and `net_worth_inr` in INR
+  - `GET /api/reports/monthly_expenses/?year=YYYY&month=MM` – monthly expense totals by category (INR)
+  - `GET /api/reports/monthly_cashflow/?year=YYYY` – monthly income/expense totals and net (INR)
+  - `GET /api/reports/net_worth_timeline/?year=YYYY` – approximate end-of-month net worth (baseline + net flows)
+
+OpenAPI (optional)
+- If `drf-spectacular` is installed, schema and Swagger UI are available:
+  - Schema: `/api/schema/`
+  - Docs: `/api/docs/`
 
 Key Behaviors and Data Flow
 - Auth: Frontend obtains tokens from `/api/token/`, stores `access_token` and `refresh_token` in `localStorage`, adds `Authorization: Bearer <token>` to API calls, and refreshes on 401s via `/api/token/refresh/`.
@@ -141,3 +163,12 @@ Operational Notes
 - The repo includes both a static frontend (`frontend`) and a React alternative (`frontend-react`). Ensure you use one consistently, and adjust CORS (`CORS_ALLOWED_ORIGINS`) and `ApiService` base URL or Vite env accordingly.
 - The compose file expects a `frontend/Dockerfile`; if missing, either add one or adjust the compose service to use `image` or a different build context.
 
+Recent Changes
+- React app
+  - Added Investments summary page at `/investments` to show totals for Stocks, Gold, and Business (file: `frontend-react/src/pages/Investments.jsx`).
+  - Added dedicated pages: Gold (`/gold`, file: `frontend-react/src/pages/GoldInvestments.jsx`) and Business (`/business`, file: `frontend-react/src/pages/BusinessInvestments.jsx`).
+  - Updated routes in `frontend-react/src/App.jsx` and navigation in `frontend-react/src/components/NavBar.jsx` to expose these.
+- Static frontend
+  - Hardened date formatting to prevent UI freeze when dates are missing/invalid (`frontend/js/api.js:394` – `formatDate` now guards and returns `'-'`).
+- Repository hygiene
+  - Expanded `.gitignore` to cover `frontend-react` artifacts, Python virtualenvs/caches, Node debug logs, and `backend/staticfiles/`.

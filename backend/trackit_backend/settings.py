@@ -6,14 +6,9 @@ from dotenv import load_dotenv
 # Build BASE_DIR (Django standard)
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load .env file from the backend directory
+# Load .env file from the backend directory (development convenience only)
 env_path = os.path.join(BASE_DIR, '.env')
 load_dotenv(env_path)
-
-# Debug: Print environment loading
-print(f"Loading .env from: {env_path}")
-print(f"API_KEY loaded: {bool(os.getenv('API_KEY'))}")
-print(f"API_SECRET loaded: {bool(os.getenv('API_SECRET'))}")
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'your-secret-key-for-development')
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
@@ -79,6 +74,7 @@ SIMPLE_JWT = {
 }
 
 CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173').split(',')
+CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://192.168.1.36:5173').split(',')
 CORS_ALLOW_CREDENTIALS = True
 
 STATIC_URL = '/static/'
@@ -111,9 +107,18 @@ SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
 KITE_API_KEY = os.environ.get('API_KEY')
 KITE_API_SECRET = os.environ.get('API_SECRET')
 
-# Debug logging for environment variables
-import logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-logger.debug(f"KITE_API_KEY loaded: {bool(KITE_API_KEY)}")
-logger.debug(f"KITE_API_SECRET loaded: {bool(KITE_API_SECRET)}")
+# Optional: OpenAPI schema support (drf-spectacular) when installed
+try:
+    import drf_spectacular  # noqa: F401
+    INSTALLED_APPS.append('drf_spectacular')
+    # Extend REST_FRAMEWORK only if available
+    REST_FRAMEWORK['DEFAULT_SCHEMA_CLASS'] = 'drf_spectacular.openapi.AutoSchema'  # type: ignore[index]
+    # Minimal spectacular settings; can be customized further
+    SPECTACULAR_SETTINGS = {
+        'TITLE': 'TrackIt API',
+        'DESCRIPTION': 'OpenAPI schema for TrackIt personal finance API',
+        'VERSION': '1.0.0',
+        'SERVE_INCLUDE_SCHEMA': False,
+    }
+except Exception:
+    pass

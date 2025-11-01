@@ -69,10 +69,18 @@ VITE_API_BASE=http://localhost:8000/api
 - API: http://localhost:8000/api
 - Admin: http://localhost:8000/admin
 
+### API Docs (optional)
+
+If `drf-spectacular` is installed (already listed in `backend/requirements.txt`):
+
+- OpenAPI schema: http://localhost:8000/api/schema/
+- Swagger UI: http://localhost:8000/api/docs/
+
 ## Quotes: How It Works
 
 - Endpoint: `GET /api/ltp/get_price/?symbol=EKC` fetches from Indian API and caches BSE/NSE in DB.
 - Endpoint: `GET /api/ltp/latest/?symbol=EKC` returns last cached quote.
+- Unified fields in both responses: `ltp`, `currency` (INR), `as_of`, `source` (in addition to `currentPrice`).
 - Scheduler (APScheduler) refreshes distinct `Investment.symbol` hourly Mon–Fri between 08:00 and 14:00.
 - Frontend holdings page includes a “Refresh Prices” button for on‑demand updates.
 
@@ -105,8 +113,17 @@ Response shape returned to the client (example):
   - `GET/PUT/DELETE /api/investments/{id}/`
   - `GET/POST /api/expenses/`, `/api/incomes/`, `/api/assets/`, `/api/liabilities/` …
 - Quotes
-  - `GET /api/ltp/get_price/?symbol=SYMBOL` — fetch + cache from upstream
-  - `GET /api/ltp/latest/?symbol=SYMBOL` — read cached
+  - `GET /api/ltp/get_price/?symbol=SYMBOL` - fetch + cache from upstream (includes `ltp`, `currency`, `as_of`, `source`)
+  - `GET /api/ltp/latest/?symbol=SYMBOL` - read cached (includes unified fields)
+- Reports
+  - `GET /api/reports/net_worth/` - snapshot totals in INR
+  - `GET /api/reports/monthly_expenses/?year=YYYY&month=MM` - expense breakdown in INR
+  - `GET /api/reports/monthly_cashflow/?year=YYYY` - monthly income/expense totals and net in INR
+  - `GET /api/reports/net_worth_timeline/?year=YYYY` - approximate end-of-month net worth based on baseline + monthly net flows
+- Reports
+  - `GET /api/reports/net_worth/` - snapshot totals in INR
+  - `GET /api/reports/monthly_expenses/?year=YYYY&month=MM` - expense breakdown in INR
+  - `GET /api/reports/monthly_cashflow/?year=YYYY` - monthly income/expense totals and net in INR
 
 ## Troubleshooting
 
@@ -121,4 +138,10 @@ Response shape returned to the client (example):
 ## Notes
 
 - Symbols should match what Indian API expects in the `name`/`symbol` query.
-- Scheduler runs in‑process; for multi‑worker deployments consider an external scheduler.
+- Scheduler runs in-process; for multi-worker deployments consider an external scheduler.
+
+## Frontend variants
+
+- React app in `frontend-react` is the primary UI going forward.
+- The legacy `frontend` service in docker-compose has been removed; run the React app locally with Vite.
+- The static `frontend` (HTML/JS) remains in the repo for legacy/testing and may be removed later.

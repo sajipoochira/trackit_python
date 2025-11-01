@@ -30,6 +30,7 @@ export default function NavBar() {
             <li className="nav-item"><Link className={isActive('/expenses')} to="/expenses">Expenses</Link></li>
             <li className="nav-item"><Link className={isActive('/assets')} to="/assets">Assets</Link></li>
             <li className="nav-item"><Link className={isActive('/liabilities')} to="/liabilities">Liabilities</Link></li>
+            <li className="nav-item"><Link className={isActive('/reports')} to="/reports">Reports</Link></li>
             <li className="nav-item"><Link className={isActive('/bulk')} to="/bulk">Bulk Import</Link></li>
           </ul>
           <div className="navbar-text me-3">
