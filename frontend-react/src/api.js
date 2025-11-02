@@ -119,6 +119,10 @@ export class ApiService {
   // LTP / Stock quotes
   getLtp(symbol) { return this.request(`/ltp/get_price/?symbol=${encodeURIComponent(symbol)}`); }
   getLatestQuote(symbol) { return this.request(`/ltp/latest/?symbol=${encodeURIComponent(symbol)}`); }
+  getLatestQuotes(symbols = []) {
+    const list = (Array.isArray(symbols) ? symbols : [symbols]).filter(Boolean).join(',');
+    return this.request(`/ltp/latest_bulk/?symbols=${encodeURIComponent(list)}`);
+  }
 
   // OPTIONS/metadata
   async options(endpoint) {

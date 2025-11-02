@@ -240,12 +240,11 @@ function StockHoldingsCard({ refreshKey = 0 }) {
       if (syms.length === 0) { if (ok) setQuotes({}); return }
       setQLoading(true)
       try {
-        const results = await Promise.all(syms.map(s => api.getLatestQuote(s).catch(() => null)))
-        const q = {}
-        results.forEach((res, idx) => {
-          if (res && syms[idx]) q[syms[idx]] = { ...(res.currentPrice || {}), updatedAt: res.updatedAt }
-        })
-        if (ok) setQuotes(q)
+        const res = await api.getLatestQuotes(syms)
+        const map = (res && res.results) || {}
+        const out = {}
+        Object.keys(map).forEach(k => { const v = map[k] || {}; out[k] = { ...(v.currentPrice || {}), updatedAt: v.updatedAt } })
+        if (ok) setQuotes(out)
       } finally { if (ok) setQLoading(false) }
     }
     loadQuotes()
@@ -259,12 +258,11 @@ function StockHoldingsCard({ refreshKey = 0 }) {
     setQLoading(true)
     try {
       await Promise.all(syms.map(s => api.getLtp(s).catch(() => null)))
-      const results = await Promise.all(syms.map(s => api.getLatestQuote(s).catch(() => null)))
-      const q = {}
-      results.forEach((res, idx) => {
-        if (res && syms[idx]) q[syms[idx]] = { ...(res.currentPrice || {}), updatedAt: res.updatedAt }
-      })
-      setQuotes(q)
+      const res = await api.getLatestQuotes(syms)
+      const map = (res && res.results) || {}
+      const out = {}
+      Object.keys(map).forEach(k => { const v = map[k] || {}; out[k] = { ...(v.currentPrice || {}), updatedAt: v.updatedAt } })
+      setQuotes(out)
     } finally { setQLoading(false) }
   }
 

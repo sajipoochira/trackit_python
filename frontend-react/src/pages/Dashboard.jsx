@@ -128,10 +128,10 @@ function HoldingsPieSection() {
       const syms = Array.from(new Set(rows.map(r => (r.symbol || '').toUpperCase()).filter(Boolean)))
       setQLoading(true)
       try {
-        const results = await Promise.all(syms.map(s => api.getLatestQuote(s).catch(() => null)))
-        const q = {}
-        results.forEach((res, idx) => { if (res && syms[idx]) q[syms[idx]] = res.currentPrice || {} })
-        if (ok) setQuotes(q)
+        const res = await api.getLatestQuotes(syms)
+        const out = {}; const map = (res && res.results) || {}
+        Object.keys(map).forEach(k => { out[k] = map[k]?.currentPrice || {} })
+        if (ok) setQuotes(out)
       } finally { if (ok) setQLoading(false) }
     }
     loadQuotes()
@@ -180,14 +180,18 @@ function HoldingsPieSection() {
         {!loading && items.length === 0 && (<div className="text-muted">No stock holdings</div>)}
         {items.length > 0 && (
           <div className="row g-4 align-items-center">
-            <div className="col-md-6">
+            <div className="col-md-6 text-center">
               <h6 className="mb-2">By Current Value (INR)</h6>
-              <PieChart data={items.map(x => ({ key: x.symbol, value: x.current }))} />
+              <div className="d-flex justify-content-center">
+                <PieChart data={items.map(x => ({ key: x.symbol, value: x.current }))} size={220} stroke={20} />
+              </div>
               <div className="small text-muted mt-2">Total: {formatCurrency(totalCurrent, 'INR')}</div>
             </div>
-            <div className="col-md-6">
+            <div className="col-md-6 text-center">
               <h6 className="mb-2">By Cost (INR)</h6>
-              <PieChart data={items.map(x => ({ key: x.symbol, value: x.cost }))} />
+              <div className="d-flex justify-content-center">
+                <PieChart data={items.map(x => ({ key: x.symbol, value: x.cost }))} size={220} stroke={20} />
+              </div>
               <div className="small text-muted mt-2">Total: {formatCurrency(totalCost, 'INR')}</div>
             </div>
             <div className="col-md-6">

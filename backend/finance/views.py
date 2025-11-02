@@ -727,3 +727,22 @@ class LTPViewSet(viewsets.ViewSet):
             'currentPrice': {'BSE': sq.bse_price, 'NSE': sq.nse_price},
             'updatedAt': sq.updated_at
         })
+
+    @action(detail=False, methods=['get'])
+    def latest_bulk(self, request):
+        symbols_param = request.query_params.get('symbols')
+        if not symbols_param:
+            return Response({'error': 'symbols query param is required (comma separated)'}, status=status.HTTP_400_BAD_REQUEST)
+        symbols = [s.strip().upper() for s in symbols_param.split(',') if s.strip()]
+        if not symbols:
+            return Response({'error': 'no valid symbols provided'}, status=status.HTTP_400_BAD_REQUEST)
+        quotes = StockQuote.objects.filter(symbol__in=symbols)
+        data = {}
+        for q in quotes:
+            data[q.symbol] = {
+                'symbol': q.symbol,
+                'companyName': q.company_name,
+                'currentPrice': {'BSE': q.bse_price, 'NSE': q.nse_price},
+                'updatedAt': q.updated_at,
+            }
+        return Response({'results': data})
