@@ -23,6 +23,9 @@ router.register(r'reports', ReportsViewSet, basename='reports')
 
 urlpatterns = [
     path('api/', include(router.urls)),
+    # Explicit LTP bulk aliases to avoid any router ambiguity
+    path('api/ltp/latest_bulk/', LTPViewSet.as_view({'get': 'latest_bulk'})),
+    path('api/ltp/latest-bulk/', LTPViewSet.as_view({'get': 'latest_bulk_dash'})),
     path('api/token/', TokenObtainPairView.as_view()),
     path('api/token/refresh/', TokenRefreshView.as_view()),
     path('api/auth/register/', RegisterView.as_view()),

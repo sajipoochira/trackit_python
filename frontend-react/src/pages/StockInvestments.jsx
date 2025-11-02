@@ -184,8 +184,16 @@ function StockHoldingsCard({ incomes = [], expenses = [], investments = [], load
     const inv = normalizeList(investments)
 
     const holdings = new Map() // symbol -> { name, qty, cost }
+    const breakdowns = new Map() // symbol -> [{ date, qty, unit, currency, charges, source }]
 
-    const addBuy = (symbol, name, qty, unitPrice, charges, currency) => {
+    const pushBreakdown = (symbol, entry) => {
+      const key = (symbol || 'UNKNOWN').toUpperCase()
+      const list = breakdowns.get(key) || []
+      list.push(entry)
+      breakdowns.set(key, list)
+    }
+
+    const addBuy = (symbol, name, qty, unitPrice, charges, currency, date, source) => {
       const q = Number(qty) || 0
       const price = Number(unitPrice) || 0
       const ch = Number(charges) || 0
@@ -197,6 +205,7 @@ function StockHoldingsCard({ incomes = [], expenses = [], investments = [], load
       cur.cost += totalPref
       if (!cur.name && name) cur.name = name
       holdings.set(symbol, cur)
+      pushBreakdown(symbol, { date, qty: q, unit: price, currency, charges: ch, source })
     }
 
     const addSell = (symbol, qty) => {
@@ -215,10 +224,14 @@ function StockHoldingsCard({ incomes = [], expenses = [], investments = [], load
     inv.forEach(x => {
       const cat = String(x.category || '').toLowerCase()
       const t = String(x.type || '').toLowerCase()
-      const isStock = cat === 'stocks' || t === 'stock' || t === 'stocks'
+      const rawSymbol = (x.symbol || '').toUpperCase().trim()
+      const nameCandidate = (x.name || '').toUpperCase().trim()
+      const looksLikeSymbol = !!nameCandidate && !nameCandidate.includes(' ') && nameCandidate.length <= 12
+      // Treat as stock if explicit stock category/type, explicit symbol, or name looks like a ticker
+      const isStock = (cat === 'stocks' || t === 'stock' || t === 'stocks' || !!rawSymbol || looksLikeSymbol)
       if (!isStock) return
-      const symbol = x.symbol || x.name || 'UNKNOWN'
-      const name = x.name || x.symbol || 'UNKNOWN'
+      const symbol = rawSymbol || (looksLikeSymbol ? nameCandidate : (x.name || 'UNKNOWN'))
+      const name = x.name || symbol
       const qty = Number(x.quantity) || Number(x.qty) || 0
       if (qty <= 0) return
       const charges = parseChargesFromNotes(x.notes)
@@ -227,7 +240,7 @@ function StockHoldingsCard({ incomes = [], expenses = [], investments = [], load
         const pv = Number(x.purchase_value) || 0
         unit = qty > 0 ? (pv / qty) : 0
       }
-      addBuy(symbol, name, qty, unit, charges, x.currency)
+      addBuy(symbol, name, qty, unit, charges, x.currency, x.date, 'investment')
     })
 
     // Buy fallbacks from Expenses titled "Stock Buy <SYMBOL>"
@@ -240,7 +253,7 @@ function StockHoldingsCard({ incomes = [], expenses = [], investments = [], load
       const m2 = String(x.notes || '').match(/@\s*([0-9]+(?:\.[0-9]+)?)/)
       if (m2) { const n = Number(m2[1]); if (Number.isFinite(n)) unit = n }
       const ch = parseChargesFromNotes(x.notes)
-      addBuy(symbol, symbol, qty, unit, ch, x.currency)
+      addBuy(symbol, symbol, qty, unit, ch, x.currency, x.date, 'expense')
     })
 
     // Sells from Income titled "Stock Sell <SYMBOL>"
@@ -259,7 +272,7 @@ function StockHoldingsCard({ incomes = [], expenses = [], investments = [], load
       return { symbol, name: v.name || symbol, qty, avg, cost }
     }).filter(r => r.qty > 0).sort((a,b)=> a.symbol.localeCompare(b.symbol))
 
-    return { rows, currency: pref }
+    return { rows, currency: pref, breakdowns: Object.fromEntries(breakdowns) }
   }, [])
 
   const { loading: localLoading, error, data } = useAsync(fetchAll, [incomes, expenses, investments])
@@ -293,6 +306,7 @@ function StockHoldingsCard({ incomes = [], expenses = [], investments = [], load
     try {
       await Promise.all(syms.map(s => api.getLtp(s).catch(() => null)))
       const res = await api.getLatestQuotes(syms)
+      console.log(res)
       const map = (res && res.results) || {}
       const out = {}
       Object.keys(map).forEach(k => { const v = map[k] || {}; out[k] = { ...(v.currentPrice || {}), updatedAt: v.updatedAt } })
@@ -311,8 +325,8 @@ function StockHoldingsCard({ incomes = [], expenses = [], investments = [], load
       <div className="card-body">
         {(loading || localLoading) && <div className="text-muted">Loading holdings…</div>}
         {error && <div className="alert alert-danger">{error}</div>}
-        {data && (
-          data.rows.length === 0 ? (
+        {!error && !(loading || localLoading) && (
+          (!data || !Array.isArray(data.rows) || data.rows.length === 0) ? (
             <div className="text-muted">No holdings</div>
           ) : (
             <div className="table-responsive">
@@ -331,7 +345,17 @@ function StockHoldingsCard({ incomes = [], expenses = [], investments = [], load
                 <tbody>
                   {data.rows.map((r, idx)=> (
                     <tr key={idx}>
-                      <td>{r.symbol}</td>
+                      <td>{(() => {
+                        const sym = String(r.symbol || '').toUpperCase()
+                        const bds = (data.breakdowns || {})[sym] || []
+                        const tip = bds.map(b => {
+                          const dt = b.date ? new Date(b.date).toLocaleDateString() : '-'
+                          const qty = formatNumber(b.qty)
+                          const unit = formatCurrency(b.unit, b.currency || 'INR')
+                          return `${dt} · ${qty} @ ${unit}`
+                        }).join('\n')
+                        return <span title={tip}>{r.symbol}</span>
+                      })()}</td>
                       <td>{r.name}</td>
                       <td className="text-end">{formatNumber(r.qty)}</td>
                       <td className="text-end">{formatCurrency(r.avg, data.currency)}</td>

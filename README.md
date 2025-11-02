@@ -1,13 +1,13 @@
 # TrackIt - Personal Finance Tracker
 
-Full‑stack personal finance tracker with Django REST API and a React frontend. Includes holdings, income, expenses, liabilities, and live stock quotes for Indian markets.
+Full-stack personal finance tracker with Django REST API and a React frontend. Includes holdings, income, expenses, liabilities, and live stock quotes for Indian markets.
 
 ## Highlights
 
 - Investment tracking: stocks, funds, crypto, real estate, gold, business, more
 - Live stock quotes: BSE/NSE via Indian API (stock.indianapi.in)
 - Auto-refresh quotes: hourly, Mon–Fri, 08:00–14:00 (server time)
-- On‑demand price refresh from the UI
+- On-demand price refresh from the UI
 - Current Stock Holdings view: Qty, Avg Cost, Total Cost, LTP, Current Value, and overall totals incl. Profit/Loss
 - JWT auth; CORS enabled for local dev
 
@@ -17,7 +17,7 @@ Full‑stack personal finance tracker with Django REST API and a React frontend.
 - Frontend: React (Vite) + Bootstrap 5 (folder: `frontend-react`)
 - Database: SQLite by default (Supabase/PostgreSQL optional)
 - Auth: JWT
-- Quotes: Indian API (BSE/NSE) + server‑side cache
+- Quotes: Indian API (BSE/NSE) + server-side cache
 
 ## Setup
 
@@ -82,7 +82,7 @@ If `drf-spectacular` is installed (already listed in `backend/requirements.txt`)
 - Endpoint: `GET /api/ltp/latest/?symbol=EKC` returns last cached quote.
 - Unified fields in both responses: `ltp`, `currency` (INR), `as_of`, `source` (in addition to `currentPrice`).
 - Scheduler (APScheduler) refreshes distinct `Investment.symbol` hourly Mon–Fri between 08:00 and 14:00.
-- Frontend holdings page includes a “Refresh Prices” button for on‑demand updates.
+- Frontend holdings page includes a "Refresh Prices" button for on-demand updates.
 
 Response shape returned to the client (example):
 
@@ -100,8 +100,8 @@ Response shape returned to the client (example):
 - Columns: Symbol, Name, Qty, Avg Cost (INR), Total Cost (INR), LTP (INR), Current Value (INR)
 - Footer totals:
   - Total Cost (sum of cost)
-  - Total Current Value (sum of qty × LTP)
-  - Profit/Loss (Current Value − Total Cost)
+  - Total Current Value (sum of qty x LTP)
+  - Profit/Loss (Current Value - Total Cost)
 
 ## API Overview
 
@@ -120,10 +120,6 @@ Response shape returned to the client (example):
   - `GET /api/reports/monthly_expenses/?year=YYYY&month=MM` - expense breakdown in INR
   - `GET /api/reports/monthly_cashflow/?year=YYYY` - monthly income/expense totals and net in INR
   - `GET /api/reports/net_worth_timeline/?year=YYYY` - approximate end-of-month net worth based on baseline + monthly net flows
-- Reports
-  - `GET /api/reports/net_worth/` - snapshot totals in INR
-  - `GET /api/reports/monthly_expenses/?year=YYYY&month=MM` - expense breakdown in INR
-  - `GET /api/reports/monthly_cashflow/?year=YYYY` - monthly income/expense totals and net in INR
 
 ## Troubleshooting
 
@@ -131,7 +127,7 @@ Response shape returned to the client (example):
   - Ensure JWT tokens are present; login via `/api/token/`.
 - Quotes not updating
   - Verify `INDIANAPI_KEY` in `backend/.env` and restart backend.
-  - Use the “Refresh Prices” button; check server logs for upstream errors.
+  - Use the "Refresh Prices" button; check server logs for upstream errors.
 - Migrations missing
   - Run `python manage.py makemigrations finance && python manage.py migrate` (adds StockQuote model).
 
@@ -145,3 +141,4 @@ Response shape returned to the client (example):
 - React app in `frontend-react` is the primary UI going forward.
 - The legacy `frontend` service in docker-compose has been removed; run the React app locally with Vite.
 - The static `frontend` (HTML/JS) remains in the repo for legacy/testing and may be removed later.
+

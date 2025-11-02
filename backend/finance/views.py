@@ -669,8 +669,8 @@ class LTPViewSet(viewsets.ViewSet):
             url = f"{base_url}/stock?name={symbol}"
             headers = {}
             if api_key:
-                # Try common auth styles — backend will accept either
-                
+                # Send both common auth styles; upstream may accept either
+                headers['Authorization'] = f"Bearer {api_key}"
                 headers['x-api-key'] = api_key
 
             logger.debug(f"Fetching currentPrice from Indian API for {symbol}")
@@ -740,6 +740,34 @@ class LTPViewSet(viewsets.ViewSet):
             'as_of': sq.updated_at,
             'source': 'indianapi',
         })
+
+    # Bulk latest quotes (cached) — supports both underscore and hyphen paths
+    @action(detail=False, methods=['get'], url_path='latest_bulk')
+    def latest_bulk(self, request):
+        symbols_param = request.query_params.get('symbols')
+        if not symbols_param:
+            return Response({'error': 'symbols query param is required (comma separated)'}, status=status.HTTP_400_BAD_REQUEST)
+        symbols = [s.strip().upper() for s in symbols_param.split(',') if s.strip()]
+        if not symbols:
+            return Response({'error': 'no valid symbols provided'}, status=status.HTTP_400_BAD_REQUEST)
+        quotes = StockQuote.objects.filter(symbol__in=symbols)
+        data = {}
+        for q in quotes:
+            data[q.symbol] = {
+                'symbol': q.symbol,
+                'companyName': q.company_name,
+                'currentPrice': {'BSE': q.bse_price, 'NSE': q.nse_price},
+                'updatedAt': q.updated_at,
+                'ltp': q.nse_price or q.bse_price,
+                'currency': 'INR',
+                'as_of': q.updated_at,
+                'source': 'indianapi',
+            }
+        return Response({'results': data})
+
+    @action(detail=False, methods=['get'], url_path='latest-bulk')
+    def latest_bulk_dash(self, request):
+        return self.latest_bulk(request)
 
 class ReportsViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
@@ -935,8 +963,7 @@ class ReportsViewSet(viewsets.ViewSet):
             'months': months,
         })
 
-    @action(detail=False, methods=['get'])
-    def latest_bulk(self, request):
+    def _build_latest_bulk(self, request):
         symbols_param = request.query_params.get('symbols')
         if not symbols_param:
             return Response({'error': 'symbols query param is required (comma separated)'}, status=status.HTTP_400_BAD_REQUEST)
@@ -953,3 +980,11 @@ class ReportsViewSet(viewsets.ViewSet):
                 'updatedAt': q.updated_at,
             }
         return Response({'results': data})
+
+    @action(detail=False, methods=['get'], url_path='latest_bulk')
+    def latest_bulk(self, request):
+        return self._build_latest_bulk(request)
+
+    @action(detail=False, methods=['get'], url_path='latest-bulk')
+    def latest_bulk_dash(self, request):
+        return self._build_latest_bulk(request)

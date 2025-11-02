@@ -1,7 +1,7 @@
 import React from 'react'
 import { api } from '../api'
 import { formatCurrency, formatNumber } from '../utils/format.js'
-import { convert as convertFx } from '../ratesStore.js'
+import { convert as convertFx, getPreferredCurrency, setPreferredCurrency, subscribe as subscribeRates } from '../ratesStore.js'
 
 function useAsync(fn, deps) {
   const [state, setState] = React.useState({ loading: true, error: '', data: null })
@@ -32,7 +32,11 @@ function parseQtyFromNotes(notes) {
 }
 
 export default function BusinessInvestments(){
-  const pref = 'INR'
+  const [pref, setPref] = React.useState(getPreferredCurrency())
+  React.useEffect(()=>{
+    const unsub = subscribeRates(()=> setPref(getPreferredCurrency()))
+    return ()=> { try { unsub && unsub() } catch(_){} }
+  }, [])
   const fetchAll = React.useCallback(async () => {
     const [incomes, expenses, investments] = await Promise.all([
       api.getIncomes(), api.getExpenses(), api.getInvestments()
@@ -69,9 +73,22 @@ export default function BusinessInvestments(){
       holdings.set(name, cur)
     }
 
-    // From Investments (category Business)
-    inv.filter(x => (String(x.category || '')).toLowerCase() === 'business').forEach(x => {
-      addBuy(x.name || 'BUSINESS', x.quantity, x.buy_price, parseChargesFromNotes(x.notes), x.currency)
+    // From Investments (category/type Business) with legacy fields support
+    inv.forEach(x => {
+      const cat = String(x.category || '').toLowerCase()
+      const t = String(x.type || '').toLowerCase()
+      const isBiz = cat === 'business' || t === 'business'
+      if (!isBiz) return
+      const name = x.name || 'BUSINESS'
+      const qty = Number(x.quantity) || Number(x.qty) || 0
+      if (qty <= 0) return
+      let unit = Number(x.buy_price) || 0
+      if (!unit) {
+        const pv = Number(x.purchase_value) || 0
+        unit = qty > 0 ? (pv / qty) : 0
+      }
+      const ch = parseChargesFromNotes(x.notes)
+      addBuy(name, qty, unit, ch, x.currency)
     })
     // Expense fallback: "Business Buy <NAME>"
     exp.filter(x => (x.title || '').toLowerCase().startsWith('business buy')).forEach(x => {
@@ -108,7 +125,13 @@ export default function BusinessInvestments(){
 
   return (
     <div>
-      <h2 className="h4 mb-3">Business Investments</h2>
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h2 className="h4 mb-0">Business Investments</h2>
+        <div className="btn-group btn-group-sm" role="group">
+          <button className={`btn btn-outline-secondary ${pref==='INR'?'active':''}`} onClick={()=> setPreferredCurrency('INR')}>INR</button>
+          <button className={`btn btn-outline-secondary ${pref==='QAR'?'active':''}`} onClick={()=> setPreferredCurrency('QAR')}>QAR</button>
+        </div>
+      </div>
       <div className="card mb-3">
         <div className="card-header"><strong>Current Business Holdings</strong></div>
         <div className="card-body">

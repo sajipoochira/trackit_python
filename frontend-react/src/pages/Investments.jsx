@@ -1,164 +1,27 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
-import DynamicForm from '../components/DynamicForm.jsx'
-import { getFormConfig } from '../utils/schema.js'
-import BulkCreateCard from '../components/BulkCreateCard.jsx'
-import { parseCSV } from '../utils/csv.js'
-import { coerceTypesWithOverrides } from '../utils/bulk.js'
-import { formatCellValue } from '../utils/format.js'
 import { convert as convertFx, getPreferredCurrency, setPreferredCurrency, subscribe as subscribeRates } from '../ratesStore.js'
+import { formatCurrency } from '../utils/format.js'
 
 export default function Investments() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [formOpen, setFormOpen] = useState(false)
-  const [formMode, setFormMode] = useState('create')
-  const [formValues, setFormValues] = useState(null)
-  const [editingId, setEditingId] = useState(null)
-  const [formConfig, setFormConfig] = useState({ overrides: {}, order: [], template: {}, readOnly: new Set() })
-  const [bulkOpen, setBulkOpen] = useState(false)
-  const [bulkText, setBulkText] = useState('')
-  const [bulkMode, setBulkMode] = useState('json')
 
-  const load = async () => {
-    setError('')
-    setLoading(true)
+  useEffect(() => { (async () => {
     try {
       const data = await api.getInvestments()
       setItems(Array.isArray(data) ? data : (data?.results || []))
     } catch (e) {
       setError(e?.message || 'Failed to load investments')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => { (async () => { setFormConfig(await getFormConfig('/investments/')); await load() })() }, [])
-
-  const useConfig = useMemo(()=>pickInvestmentConfig(formConfig), [formConfig])
-  const columns = useMemo(()=>getColumns(items, useConfig), [items, useConfig])
-
-  function openCreate() {
-    setFormMode('create')
-    setEditingId(null)
-    const template = Object.keys(useConfig.template || {}).length ? useConfig.template : seedTemplate(items[0])
-    setFormValues(template)
-    setFormOpen(true)
-  }
-  function openBulk() {
-    const sample = Object.keys(useConfig.template || {}).length ? useConfig.template : seedTemplate(items[0])
-    setBulkText(JSON.stringify([sample], null, 2))
-    setBulkOpen(true)
-  }
-  const parseItems = React.useCallback((input)=>{
-    if (bulkMode === 'csv') {
-      const rows = parseCSV(input)
-      return rows.map(r => coerceTypesWithOverrides(r, useConfig.overrides))
-    }
-    const parsed = JSON.parse(input || '[]')
-    return Array.isArray(parsed) ? parsed : (parsed ? [parsed] : [])
-  }, [bulkMode, useConfig])
-
-  function openEdit(item) {
-    const id = item.id ?? item.pk
-    if (!id) return
-    setFormMode('edit')
-    setEditingId(id)
-    setFormValues(stripReadOnly(item, useConfig.readOnly))
-    setFormOpen(true)
-  }
-
-  async function onDelete(item) {
-    const id = item.id ?? item.pk
-    if (!id) return
-    if (!confirm('Delete this investment?')) return
-    try {
-      await api.deleteInvestment(id)
-      await load()
-    } catch (e) {
-      alert(e?.message || 'Delete failed')
-    }
-  }
-
-  async function handleSubmit(payload) {
-    if (formMode === 'create') await api.createInvestment(payload)
-    else if (formMode === 'edit' && editingId) await api.updateInvestment(editingId, payload)
-    setFormOpen(false)
-    await load()
-  }
+    } finally { setLoading(false) }
+  })() }, [])
 
   return (
     <div>
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h2 className="h4 mb-0">Investments</h2>
-        <div className="d-flex gap-2">
-          <button className="btn btn-primary" onClick={openCreate}>New Investment</button>
-          <button className="btn btn-outline-secondary" onClick={openBulk}>Bulk Add</button>
-          <button className="btn btn-outline-primary" onClick={load} disabled={loading}>Refresh</button>
-        </div>
-      </div>
+      <h2 className="h4 mb-3">Investments Summary</h2>
       {error && <div className="alert alert-danger">{error}</div>}
-
-      {formOpen && (
-        <DynamicForm
-          title={`${formMode === 'create' ? 'Create' : 'Edit'} Investment`}
-          initialValues={formValues || {}}
-          overrides={useConfig.overrides}
-          order={useConfig.order}
-          onSubmit={handleSubmit}
-          onCancel={() => setFormOpen(false)}
-        />
-      )}
-
-      {bulkOpen && (
-        <BulkCreateCard
-          title="Bulk Create Investments"
-          text={bulkText}
-          setText={setBulkText}
-          onSubmit={async (item)=>{ await api.createInvestment(item) }}
-          onCancel={()=> setBulkOpen(false)}
-          help="Provide JSON array or CSV with header row. Unknown fields will be ignored if serializer allows."
-          mode={bulkMode}
-          setMode={setBulkMode}
-          parseItems={parseItems}
-        />
-      )}
-
-      <div className="card">
-        <div className="card-header"><strong>Investment List</strong></div>
-        <div className="card-body">
-          {!items.length ? (
-            <div className="text-muted">No data</div>
-          ) : (
-            <div className="table-responsive">
-              <table className="table table-striped">
-                <thead>
-                  <tr>
-                    {columns.map((c) => (<th key={c.key}>{c.label}</th>))}
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item, idx) => (
-                    <tr key={idx}>
-                      {columns.map((c) => (<td key={c.key}>{formatCellValue(item, c.key, useConfig)}</td>))}
-                      <td>
-                        <div className="btn-group btn-group-sm" role="group">
-                          <button className="btn btn-outline-primary" onClick={()=>openEdit(item)}>Edit</button>
-                          <button className="btn btn-outline-danger" onClick={()=>onDelete(item)}>Delete</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <StocksAccumulatedCard items={items} />
+      <SummaryCard items={items} loading={loading} />
     </div>
   )
 }
@@ -224,21 +87,46 @@ function labelize(name){
   return String(name).replace(/_/g,' ').replace(/\b\w/g,m=>m.toUpperCase())
 }
 
-function StocksAccumulatedCard({ items = [] }){
+function SummaryCard({ items = [], loading = false }){
   const [pref, setPref] = useState(getPreferredCurrency())
   useEffect(() => {
     const unsub = subscribeRates(() => setPref(getPreferredCurrency()))
     return () => { try { unsub && unsub() } catch(_){} }
   }, [])
 
-  const stocks = useMemo(() => (items || []).filter(x => (String(x.category || '')).toLowerCase() === 'stocks'), [items])
+  const stocks = useMemo(() => (items || []).filter(x => {
+    const cat = String(x.category || '').toLowerCase()
+    const t = String(x.type || '').toLowerCase()
+    const nameCandidate = (x.name || '').toUpperCase().trim()
+    const looksLikeSymbol = !!nameCandidate && !nameCandidate.includes(' ') && nameCandidate.length <= 12
+    return cat === 'stocks' || t === 'stock' || t === 'stocks' || !!(x.symbol) || looksLikeSymbol
+  }), [items])
+  const gold = useMemo(() => (items || []).filter(x => {
+    const cat = String(x.category || '').toLowerCase(); const t = String(x.type || '').toLowerCase();
+    return cat === 'gold' || t === 'gold'
+  }), [items])
+  const business = useMemo(() => (items || []).filter(x => {
+    const cat = String(x.category || '').toLowerCase(); const t = String(x.type || '').toLowerCase();
+    return cat === 'business' || t === 'business'
+  }), [items])
+  const others = useMemo(() => (items || []).filter(x => {
+    const cat = String(x.category || '').toLowerCase(); const t = String(x.type || '').toLowerCase();
+    const isStock = cat === 'stocks' || t === 'stock' || t === 'stocks' || !!(x.symbol)
+    const isGold = cat === 'gold' || t === 'gold'
+    const isBiz = cat === 'business' || t === 'business'
+    return !(isStock || isGold || isBiz)
+  }), [items])
 
   const perSymbol = useMemo(() => {
     const map = new Map()
     stocks.forEach(x => {
-      const sym = x.symbol || x.name || 'UNKNOWN'
-      const qty = Number(x.quantity) || 0
-      const price = Number(x.buy_price) || 0
+      const sym = (x.symbol || x.name || 'UNKNOWN').toUpperCase()
+      const qty = Number(x.quantity) || Number(x.qty) || 0
+      let price = Number(x.buy_price) || 0
+      if (!price) {
+        const pv = Number(x.purchase_value) || 0
+        price = qty > 0 ? (pv / qty) : 0
+      }
       const cur = String(x.currency || 'INR').toUpperCase()
       const costNative = qty * price
       const cost = cur === pref ? costNative : (convertFx(costNative, cur, pref) || costNative)
@@ -295,65 +183,85 @@ function StocksAccumulatedCard({ items = [] }){
     return { totalCost, totalCurr, pnl: totalCurr - totalCost }
   }, [rows])
 
+  // Gold & Business & Others: use cost as current (no live price)
+  const sumCategory = (arr) => {
+    let cost = 0
+    arr.forEach(x => {
+      const qty = Number(x.quantity) || Number(x.qty) || 0
+      let price = Number(x.buy_price) || 0
+      if (!price) { const pv = Number(x.purchase_value) || 0; price = qty > 0 ? (pv / qty) : 0 }
+      const ch = 0 // notes parsing optional
+      const native = qty * price + ch
+      const cur = String(x.currency || 'INR').toUpperCase()
+      const val = cur === pref ? native : (convertFx(native, cur, pref) || native)
+      cost += val
+    })
+    return { cost, current: cost, pnl: 0 }
+  }
+  const goldTotals = useMemo(()=> sumCategory(gold), [gold, pref])
+  const bizTotals = useMemo(()=> sumCategory(business), [business, pref])
+  const otherTotals = useMemo(()=> sumCategory(others), [others, pref])
+
   const setCurrency = (c) => { try { setPreferredCurrency(c); setPref(c) } catch(_){} }
 
   return (
     <div className="card mb-3">
       <div className="card-header d-flex align-items-center justify-content-between">
-        <strong>Stocks Summary (Accumulated)</strong>
+        <strong>Investments Summary</strong>
         <div className="d-flex align-items-center gap-2">
           <div className="btn-group btn-group-sm" role="group">
             <button className={`btn btn-outline-secondary ${pref==='INR'?'active':''}`} onClick={()=>setCurrency('INR')}>INR</button>
             <button className={`btn btn-outline-secondary ${pref==='QAR'?'active':''}`} onClick={()=>setCurrency('QAR')}>QAR</button>
           </div>
-          <button className="btn btn-sm btn-outline-primary" onClick={refreshNow} disabled={qLoading}>{qLoading ? 'Refreshing…' : 'Refresh Prices'}</button>
+          <button className="btn btn-sm btn-outline-primary" onClick={refreshNow} disabled={qLoading}>{qLoading ? 'Refreshing…' : 'Refresh Prices (Stocks)'}</button>
         </div>
       </div>
       <div className="card-body">
-        {rows.length === 0 ? (
-          <div className="text-muted">No stock investments</div>
+        {loading ? (
+          <div className="text-muted">Loading…</div>
         ) : (
           <div className="table-responsive">
             <table className="table table-sm align-middle">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Symbol</th>
                   <th>Type</th>
-                  <th className="text-end">Qty</th>
-                  <th className="text-end">Current value ({pref})</th>
-                  <th className="text-end">Purchase value ({pref})</th>
-                  <th>Currency</th>
-                  <th>Actions</th>
+                  <th className="text-end">Total Cost ({pref})</th>
+                  <th className="text-end">Current Value ({pref})</th>
+                  <th className="text-end">P/L ({pref})</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r, i) => (
-                  <tr key={r.symbol || i}>
-                    <td>{r.name || r.symbol}</td>
-                    <td>{r.symbol}</td>
-                    <td>Stocks</td>
-                    <td className="text-end">{Number(r.qty) || 0}</td>
-                    <td className="text-end">{r.current != null ? r.current.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'}</td>
-                    <td className="text-end">{Number(r.cost || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                    <td>{pref}</td>
-                    <td>
-                      <button className="btn btn-sm btn-outline-secondary" onClick={async ()=>{ setQLoading(true); try { await api.getLtp(r.symbol); await loadQuotes([r.symbol]); } finally { setQLoading(false) }}} disabled={qLoading}>Refresh</button>
-                    </td>
-                  </tr>
-                ))}
+                <tr>
+                  <td>Stocks</td>
+                  <td className="text-end">{formatCurrency(totals.totalCost, pref)}</td>
+                  <td className="text-end">{formatCurrency(totals.totalCurr, pref)}</td>
+                  <td className="text-end">{formatCurrency(totals.pnl, pref)}</td>
+                </tr>
+                <tr>
+                  <td>Gold</td>
+                  <td className="text-end">{formatCurrency(goldTotals.cost, pref)}</td>
+                  <td className="text-end">{formatCurrency(goldTotals.current, pref)}</td>
+                  <td className="text-end">{formatCurrency(goldTotals.pnl, pref)}</td>
+                </tr>
+                <tr>
+                  <td>Business</td>
+                  <td className="text-end">{formatCurrency(bizTotals.cost, pref)}</td>
+                  <td className="text-end">{formatCurrency(bizTotals.current, pref)}</td>
+                  <td className="text-end">{formatCurrency(bizTotals.pnl, pref)}</td>
+                </tr>
+                <tr>
+                  <td>Other</td>
+                  <td className="text-end">{formatCurrency(otherTotals.cost, pref)}</td>
+                  <td className="text-end">{formatCurrency(otherTotals.current, pref)}</td>
+                  <td className="text-end">{formatCurrency(otherTotals.pnl, pref)}</td>
+                </tr>
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan="4" className="text-end fw-semibold">Totals</td>
-                  <td className="text-end fw-semibold">{totals.totalCurr.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                  <td className="text-end fw-semibold">{totals.totalCost.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                  <td>{pref}</td>
-                  <td></td>
-                </tr>
-                <tr>
-                  <td colSpan="7" className="text-end">Profit / Loss ({pref})</td>
-                  <td className="text-end fw-semibold">{totals.pnl.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                  <td className="text-end fw-semibold">Totals</td>
+                  <td className="text-end fw-semibold">{formatCurrency((totals.totalCost + goldTotals.cost + bizTotals.cost + otherTotals.cost), pref)}</td>
+                  <td className="text-end fw-semibold">{formatCurrency((totals.totalCurr + goldTotals.current + bizTotals.current + otherTotals.current), pref)}</td>
+                  <td className="text-end fw-semibold">{formatCurrency((totals.pnl + goldTotals.pnl + bizTotals.pnl + otherTotals.pnl), pref)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -363,4 +271,3 @@ function StocksAccumulatedCard({ items = [] }){
     </div>
   )
 }
-
