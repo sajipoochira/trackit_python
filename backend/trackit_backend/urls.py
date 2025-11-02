@@ -18,6 +18,8 @@ router.register(r'liabilities', LiabilityViewSet)
 router.register(r'money-lent', MoneyLentViewSet)
 router.register(r'exchange-rates', ExchangeRateViewSet)
 router.register(r'ltp', LTPViewSet, basename='ltp')
+from finance.views import ReportsViewSet
+router.register(r'reports', ReportsViewSet, basename='reports')
 
 urlpatterns = [
     path('api/', include(router.urls)),
@@ -27,3 +29,13 @@ urlpatterns = [
     path('api/auth/me/', CurrentUserView.as_view()),
     path('admin/', admin.site.urls),
 ]
+
+# Optional OpenAPI schema/docs when drf-spectacular is installed
+try:
+    from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+    urlpatterns += [
+        path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+        path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema')),
+    ]
+except Exception:
+    pass

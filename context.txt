@@ -1,0 +1,174 @@
+TrackIt – Application Context
+
+Overview
+- Full-stack personal finance tracker with a Django REST API backend and a simple frontend (static HTML/JS in `frontend`; an alternative React app exists in `frontend-react`).
+- Tracks investments, income, expenses, budgets, assets, liabilities, and money lent. Includes live stock quotes for Indian markets with server-side caching and a scheduler.
+
+Repository Layout
+- backend: Django project `trackit_backend` with apps:
+  - finance: domain models, serializers, viewsets (investments, income, expenses, budgets, assets, liabilities, money lent, exchange rates, stock quotes, and LTP endpoints)
+  - users: registration and current-user endpoints
+  - tools: `supabase_client.py` helper
+  - Entrypoints: `manage.py`, `Dockerfile`, `requirements.txt`, `db.sqlite3` (dev)
+- frontend: Static Bootstrap/Chart.js app driven by `js/*.js` modules and `index.html`
+- frontend-react: React + Vite frontend (optional alternative to `frontend`)
+- docker-compose.yml: Services for backend (`web`) and frontend
+- README.md: Setup, APIs, and feature overview
+
+Backend (Django REST Framework)
+- Project: `trackit_backend` (settings at `backend/trackit_backend/settings.py:1` and routes at `backend/trackit_backend/urls.py:1`).
+- Installed apps: Django core apps, `rest_framework`, `corsheaders`, `rest_framework_simplejwt`, `finance`, `users`.
+- AuthN/AuthZ:
+  - JWT via `rest_framework_simplejwt`; default permission is authenticated (`IsAuthenticated`) across the API. Specific endpoints allow anonymous where noted (e.g., LTPViewSet uses `AllowAny`).
+  - Token endpoints: `POST /api/token/`, `POST /api/token/refresh/`.
+- CORS: `CORS_ALLOWED_ORIGINS` via env (default `http://localhost:5173`), credentials allowed.
+- Database: Uses `DATABASE_URL` if present (via `dj_database_url`), else SQLite at `backend/db.sqlite3`.
+- Environment/Config (pulled from settings/env):
+  - `DJANGO_SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `DATABASE_URL`
+  - Indian API for quotes: `INDIANAPI_BASE_URL` (default `https://stock.indianapi.in`), `INDIANAPI_KEY`
+  - Supabase (optional): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+  - Kite (present in settings for potential use): `API_KEY`, `API_SECRET`
+
+Finance Domain Models (backend/finance/models.py)
+- StockQuote: `symbol` (unique), `company_name`, cached `bse_price`, `nse_price`, `updated_at`.
+- ExchangeRate: `from_currency`, `to_currency`, `rate`, `updated_at` (unique pair). Used to convert values to INR throughout.
+- Investment: `user`, `name`, optional `symbol`, `type`, `qty`, `current_value`, `purchase_value`, `currency`, timestamps.
+- Income: `user`, `source`, `category` (choice), `amount`, `currency` (choice), `date`, recurrence fields (`is_recurring`, `recurring_period`, `next_occurrence`), `notes`.
+- Budget: `user`, `category` (matches expense categories), `allocated_amount`, `currency`, `period` (monthly/quarterly/yearly), `start_date`, `end_date`, `is_active`, `notes`, timestamps.
+  - Helpers: allocated in INR, spent amount, remaining amount, utilization percentage.
+- Expense: `user`, `title`, `amount`, `category` (choice), `currency` (choice), `date`, `notes`.
+  - Helpers: amount in INR, resolve active budget for category/date window.
+- Asset: `user`, `name`, `type` (choice), `value`, `currency` (choice), optional `purchase_date`, `notes`.
+  - Bank fields: `account_number`, `bank_name`, `account_type`. Helper to convert value to INR.
+- Liability: `user`, `name`, `type` (choice), `principal_amount`, `current_balance`, `currency` (choice), `interest_rate`, `monthly_payment`, `start_date`, `due_date`, `next_payment_date`, `status` (choice), `lender_name`, `notes`, timestamps.
+  - Helpers: INR conversions, paid amount, completion %, monthly payment in INR.
+- MoneyLent: `user`, `borrower_name`, `amount_lent`, `amount_returned`, `currency` (choice), `date_lent`, `expected_return_date`, `status` (choice), `borrower_contact`, `purpose`, `notes`, timestamps.
+  - Helpers: INR conversions, outstanding amount (+ INR), return %; auto-update status based on amount returned.
+
+Serializers (backend/finance/serializers.py)
+- Include computed fields for INR conversions, display strings for choice fields, and summary helpers for budgets/liabilities/money-lent. Partial updates supported where relevant.
+
+Views and API Endpoints (backend/finance/views.py, backend/trackit_backend/urls.py)
+- Common: `BaseViewSet` filters by `request.user` and stamps `user` on create.
+- Investments (`/api/investments/`): CRUD; supports partial updates; computed INR totals via serializer.
+- Income (`/api/incomes/`): CRUD; sets `next_occurrence` for recurring items; actions:
+  - `GET /api/incomes/categories/` – list categories
+  - `GET /api/incomes/recurring_periods/` – list recurring periods
+  - `GET /api/incomes/summary/` – per-category and per-currency summaries, totals
+- Budgets (`/api/budgets/`): CRUD + filters (`period`, `is_active`), actions:
+  - `GET /api/budgets/categories/` – budget categories (derived from expenses)
+  - `GET /api/budgets/periods/` – available periods
+  - `POST /api/budgets/create_monthly_budget/` – create current month budget for a category
+  - `GET /api/budgets/current_month_summary/` – aggregated monthly budget view and totals
+- Expenses (`/api/expenses/`): CRUD + filters (`category`, `start_date`, `end_date`), actions:
+  - `GET /api/expenses/categories/` – list categories
+  - `GET /api/expenses/summary/` – per-category summary with INR totals
+  - `GET /api/expenses/budget_analysis/` – compare current month expenses vs active budgets
+- Assets (`/api/assets/`): CRUD; actions:
+  - `GET /api/assets/types/` – list asset types
+  - `GET /api/assets/summary/` – summaries by type and currency; total value in INR
+- Liabilities (`/api/liabilities/`): CRUD + filters (`status`, `type`), actions:
+  - `GET /api/liabilities/types/` – list liability types
+  - `GET /api/liabilities/statuses/` – list statuses
+  - `GET /api/liabilities/summary/` – summaries (principal, balance) by type and status; INR totals
+  - `GET /api/liabilities/upcoming_payments/` – next 30 days active liabilities
+- Money Lent (`/api/money-lent/`): CRUD; actions:
+  - `GET /api/money-lent/summary/` – overall summaries (see serializer/helpers)
+  - `POST /api/money-lent/{id}/record_payment/` – record a repayment and auto-update status
+- Exchange Rates (`/api/exchange-rates/`): CRUD; actions:
+  - `GET /api/exchange-rates/current_rates/` – maps of configured pairs with timestamps
+  - `POST /api/exchange-rates/update_rate/` – upsert a pair’s rate
+- Live Quotes (LTP):
+  - `GET /api/ltp/get_price/?symbol=SYMBOL` - fetch from Indian API and cache (`StockQuote`), open to all (`AllowAny`). Response also includes unified fields: `ltp`, `currency` (INR), `as_of`, `source`, in addition to `currentPrice`.
+  - `GET /api/ltp/latest/?symbol=SYMBOL` - return last cached price with the same unified fields
+
+Scheduler (backend/finance/apps.py)
+- APScheduler background job runs hourly on weekdays 08:00–14:00 (server time) to refresh quotes for distinct `Investment.symbol` values using the Indian API, storing to `StockQuote`.
+- Designed to avoid duplicate scheduling across reloads using a module-level `_scheduler_started` guard.
+
+Users App (backend/users)
+- `POST /api/auth/register/` – open registration (username, email, password)
+- `GET /api/auth/me/` – current authenticated user profile
+
+Backend Runtime/Container
+- `backend/Dockerfile`: Python 3.10 slim; installs `requirements.txt`; default command runs migrations then serves via Gunicorn on `0.0.0.0:8000`.
+- `docker-compose.yml`:
+  - `web`: builds `./backend`, mounts source, exposes 8000; uses env from `backend/.env`.
+  - Frontend service removed to avoid confusion; run the React app locally via Vite (`frontend-react`).
+
+Frontend (Static HTML/JS in `frontend`)
+- Entry: `frontend/index.html:1` using Bootstrap 5, Bootstrap Icons, and Chart.js.
+- Modules in `frontend/js/`:
+  - `api.js:1`: ApiService wraps REST calls against `http://localhost:8000/api` and handles JWT storage/refresh in `localStorage`. Endpoints mirror backend routes (investments, income, expenses, budgets, assets, liabilities, money-lent, exchange-rates, LTP).
+  - `auth.js:1`: login/register flows, navbar user display, auth gating (shows login screen vs app), logout.
+  - `dashboard.js:1`: loads data in parallel and renders metrics, charts, and recent items.
+  - `investments.js`, `income.js`, `expenses.js`, `assets.js`, `liabilities.js`: per-section UI render + CRUD using `api.js`.
+  - `nav.js`, `app.js`: section switching, basic bootstrapping, helpers.
+- Screens/Sections in `index.html`: Login, Dashboard, Investments, Income, Expenses & Budget, Assets & Bank Accounts, Liabilities & Money Lent; plus modals for creating/editing entities.
+- Styling: `css/style.css`, `css/bw.css` (black/white theme overrides).
+
+Frontend (React in `frontend-react`)
+- Alternative React + Vite app with Bootstrap; `VITE_API_BASE` env can point to the backend (default `http://localhost:8000/api`).
+- Not required to run the static `frontend` app but available if you prefer React.
+- Pages and routes (React):
+  - `Dashboard` → `/`
+  - `Investments` (summary for Stocks/Gold/Business) → `/investments` (file: `frontend-react/src/pages/Investments.jsx`)
+  - `Stocks` (detailed equities tooling and quotes) → `/stocks` (file: `frontend-react/src/pages/StockInvestments.jsx`)
+  - `Gold Investments` → `/gold` (file: `frontend-react/src/pages/GoldInvestments.jsx`)
+  - `Business Investments` → `/business` (file: `frontend-react/src/pages/BusinessInvestments.jsx`)
+  - `Income` → `/income`, `Expenses` → `/expenses`, `Assets` → `/assets`, `Liabilities` → `/liabilities`, `Bulk Import` → `/bulk`
+- Navigation updated in `frontend-react/src/components/NavBar.jsx` to include Investments, Stocks, Gold, Business.
+- Routes wired in `frontend-react/src/App.jsx` to include the above.
+  - Reports page `/reports` (file: `frontend-react/src/pages/Reports.jsx`) with snapshot, cashflow, and timeline. Includes inline mini bar charts (no external chart libs required).
+
+Reports
+- New endpoints:
+  - `GET /api/reports/net_worth/` – totals (assets, investments, money lent, liabilities) and `net_worth_inr` in INR
+  - `GET /api/reports/monthly_expenses/?year=YYYY&month=MM` – monthly expense totals by category (INR)
+  - `GET /api/reports/monthly_cashflow/?year=YYYY` – monthly income/expense totals and net (INR)
+  - `GET /api/reports/net_worth_timeline/?year=YYYY` – approximate end-of-month net worth (baseline + net flows)
+
+OpenAPI (optional)
+- If `drf-spectacular` is installed, schema and Swagger UI are available:
+  - Schema: `/api/schema/`
+  - Docs: `/api/docs/`
+
+Key Behaviors and Data Flow
+- Auth: Frontend obtains tokens from `/api/token/`, stores `access_token` and `refresh_token` in `localStorage`, adds `Authorization: Bearer <token>` to API calls, and refreshes on 401s via `/api/token/refresh/`.
+- Currency conversion: Many serializers expose INR-denominated computed fields by reading `ExchangeRate` pairs; missing rates fall back to raw values.
+- Budgets vs Expenses: Budgets are keyed by category and period; helpers compute allocated vs spent vs remaining with utilization ratios; expense summaries and budget analysis endpoints support UI dashboards.
+- Live quotes: LTP endpoints fetch from Indian API and cache to `StockQuote`; a scheduler refreshes popular symbols on a schedule; UI exposes a refresh button for on-demand updates.
+
+Setup Summary (see README.md for details)
+- Backend quickstart:
+  - Create `backend/.env` with Django and Indian API env vars (see README).
+  - `cd backend && pip install -r requirements.txt && python manage.py makemigrations && python manage.py migrate && python manage.py runserver`
+- Frontend (static): open `frontend/index.html` using a static server or serve the folder; or run via docker-compose frontend service.
+- Frontend (React): `cd frontend-react && npm install && npm run dev` (access at `http://localhost:5173`).
+- Compose: `docker-compose up --build` (ensure frontend has a valid Dockerfile or adjust Compose).
+
+Notable Files for Reference
+- Backend settings: backend/trackit_backend/settings.py:1
+- Backend routes: backend/trackit_backend/urls.py:1
+- Finance models: backend/finance/models.py:1
+- Finance views: backend/finance/views.py:1
+- Scheduler: backend/finance/apps.py:1
+- Users: backend/users/views.py:1, backend/users/serializers.py:1
+- Frontend entry: frontend/index.html:1
+- API wrapper: frontend/js/api.js:1
+- Compose: docker-compose.yml:1
+
+Operational Notes
+- Default REST permission is authenticated; ensure JWT tokens are present in requests from the frontend.
+- The repo includes both a static frontend (`frontend`) and a React alternative (`frontend-react`). Ensure you use one consistently, and adjust CORS (`CORS_ALLOWED_ORIGINS`) and `ApiService` base URL or Vite env accordingly.
+- The compose file expects a `frontend/Dockerfile`; if missing, either add one or adjust the compose service to use `image` or a different build context.
+
+Recent Changes
+- React app
+  - Added Investments summary page at `/investments` to show totals for Stocks, Gold, and Business (file: `frontend-react/src/pages/Investments.jsx`).
+  - Added dedicated pages: Gold (`/gold`, file: `frontend-react/src/pages/GoldInvestments.jsx`) and Business (`/business`, file: `frontend-react/src/pages/BusinessInvestments.jsx`).
+  - Updated routes in `frontend-react/src/App.jsx` and navigation in `frontend-react/src/components/NavBar.jsx` to expose these.
+- Static frontend
+  - Hardened date formatting to prevent UI freeze when dates are missing/invalid (`frontend/js/api.js:394` – `formatDate` now guards and returns `'-'`).
+- Repository hygiene
+  - Expanded `.gitignore` to cover `frontend-react` artifacts, Python virtualenvs/caches, Node debug logs, and `backend/staticfiles/`.

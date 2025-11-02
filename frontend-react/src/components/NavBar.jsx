@@ -24,10 +24,13 @@ export default function NavBar() {
             <li className="nav-item"><Link className={isActive('/')} to="/">Dashboard</Link></li>
             <li className="nav-item"><Link className={isActive('/investments')} to="/investments">Investments</Link></li>
             <li className="nav-item"><Link className={isActive('/stocks')} to="/stocks">Stocks</Link></li>
+            <li className="nav-item"><Link className={isActive('/gold')} to="/gold">Gold</Link></li>
+            <li className="nav-item"><Link className={isActive('/business')} to="/business">Business</Link></li>
             <li className="nav-item"><Link className={isActive('/income')} to="/income">Income</Link></li>
             <li className="nav-item"><Link className={isActive('/expenses')} to="/expenses">Expenses</Link></li>
             <li className="nav-item"><Link className={isActive('/assets')} to="/assets">Assets</Link></li>
             <li className="nav-item"><Link className={isActive('/liabilities')} to="/liabilities">Liabilities</Link></li>
+            <li className="nav-item"><Link className={isActive('/reports')} to="/reports">Reports</Link></li>
             <li className="nav-item"><Link className={isActive('/bulk')} to="/bulk">Bulk Import</Link></li>
           </ul>
           <div className="navbar-text me-3">

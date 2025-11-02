@@ -142,7 +142,7 @@ export default function Investments() {
                 <tbody>
                   {items.map((item, idx) => (
                     <tr key={idx}>
-                    {columns.map((c) => (<td key={c.key}>{formatCellValue(item, c.key, useConfig)}</td>))}
+                      {columns.map((c) => (<td key={c.key}>{formatCellValue(item, c.key, useConfig)}</td>))}
                       <td>
                         <div className="btn-group btn-group-sm" role="group">
                           <button className="btn btn-outline-primary" onClick={()=>openEdit(item)}>Edit</button>
@@ -157,6 +157,7 @@ export default function Investments() {
           )}
         </div>
       </div>
+
       <StocksAccumulatedCard items={items} />
     </div>
   )
@@ -183,7 +184,8 @@ function seedTemplate(sample) {
       quantity: 0,
       buy_price: 0,
       currency: 'INR',
-      date: ''
+      date: '',
+      category: 'Stocks'
     })
   }
   return out
@@ -361,3 +363,4 @@ function StocksAccumulatedCard({ items = [] }){
     </div>
   )
 }
+

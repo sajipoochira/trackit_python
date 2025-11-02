@@ -9,12 +9,49 @@ export default function StockInvestments(){
   const [refreshKey, setRefreshKey] = React.useState(0)
   const onChanged = React.useCallback(()=> setRefreshKey(x=>x+1), [])
   const [show, setShow] = React.useState({ transfers: false, buy: false, sell: false })
+
+  const [incomes, setIncomes] = React.useState([])
+  const [expenses, setExpenses] = React.useState([])
+  const [investments, setInvestments] = React.useState([])
+  const [dataLoading, setDataLoading] = React.useState(true)
+  const [dataError, setDataError] = React.useState('')
+
+  React.useEffect(() => {
+    let ok = true
+    const loadAll = async () => {
+      setDataError(''); setDataLoading(true)
+      try {
+        const [inc, exp, inv] = await Promise.all([
+          api.getIncomes(),
+          api.getExpenses(),
+          api.getInvestments(),
+        ])
+        if (!ok) return
+        setIncomes(Array.isArray(inc) ? inc : (inc?.results || []))
+        setExpenses(Array.isArray(exp) ? exp : (exp?.results || []))
+        setInvestments(Array.isArray(inv) ? inv : (inv?.results || []))
+      } catch(e) {
+        if (ok) setDataError(e?.message || 'Failed to load data')
+      } finally {
+        if (ok) setDataLoading(false)
+      }
+    }
+    loadAll()
+    return () => { ok = false }
+  }, [refreshKey])
+
   return (
     <div>
       <h2 className="h4 mb-3">Stock Investments</h2>
-      <BrokerSummaryCard refreshKey={refreshKey} />
+      {dataError && <div className="alert alert-danger">{dataError}</div>}
+      <div className="mb-2">
+        <button className="btn btn-sm btn-outline-primary" onClick={()=>setRefreshKey(x=>x+1)} disabled={dataLoading}>
+          {dataLoading ? 'Loading…' : 'Refresh Data'}
+        </button>
+      </div>
+      <BrokerSummaryCard incomes={incomes} expenses={expenses} investments={investments} loading={dataLoading} />
       <StockPriceCard />
-      <StockHoldingsCard refreshKey={refreshKey} />
+      <StockHoldingsCard incomes={incomes} expenses={expenses} investments={investments} loading={dataLoading} />
 
       <div className="d-flex gap-2 mb-3">
         <button className={`btn btn-outline-secondary btn-sm ${show.transfers ? 'active' : ''}`} onClick={()=> setShow(s=>({ ...s, transfers: !s.transfers }))}>Broker Transfers</button>
@@ -71,19 +108,13 @@ function triggerDownload(filename, content, mime='text/csv'){
   } catch(_) {}
 }
 
-function BrokerSummaryCard({ refreshKey = 0 }) {
+function BrokerSummaryCard({ incomes = [], expenses = [], investments = [], loading = false }) {
   const pref = 'INR'
   const [manualTick, setManualTick] = React.useState(0)
-  const fetchAll = React.useCallback(async () => {
-    const [incomes, expenses, investments] = await Promise.all([
-      api.getIncomes(),
-      api.getExpenses(),
-      api.getInvestments(),
-    ])
+  const data = React.useMemo(() => {
     const inc = normalizeList(incomes)
     const exp = normalizeList(expenses)
     const inv = normalizeList(investments)
-
     const convertAmt = (amt, cur) => {
       const n = Number(amt) || 0
       if (!cur || cur === pref) return n
@@ -98,7 +129,6 @@ function BrokerSummaryCard({ refreshKey = 0 }) {
       .reduce((s, x) => s + convertAmt(x.amount, x.currency), 0)
     const buyExpensesFallback = exp.filter(x => (x.title || '').toLowerCase().startsWith('stock buy'))
       .reduce((s, x) => s + convertAmt(x.amount, x.currency), 0)
-
     const stockInvestments = inv.filter(x => (String(x.category || '')).toLowerCase() === 'stocks')
     const buysFromInvestments = stockInvestments.reduce((s, x) => {
       const qty = Number(x.quantity) || 0
@@ -107,22 +137,17 @@ function BrokerSummaryCard({ refreshKey = 0 }) {
       const total = qty * price + ch
       return s + convertAmt(total, x.currency)
     }, 0)
-
     const totalBuys = buyExpensesFallback + buysFromInvestments
     const balance = deposits - withdrawals - totalBuys + sellProceeds
-
     return { deposits, withdrawals, totalBuys, sellProceeds, balance, pref }
-  }, [])
-
-  const { loading, error, data } = useAsync(fetchAll, [refreshKey, manualTick])
+  }, [incomes, expenses, investments, manualTick])
 
   return (
     <div className="card mb-3">
       <div className="card-header"><strong>Broker Cash Summary</strong></div>
       <div className="card-body">
         {loading && <div className="text-muted">Loading summary…</div>}
-        {error && <div className="alert alert-danger">{error}</div>}
-        {data && (
+        {data && !loading && (
           <>
             <div className="row">
               <SummaryItem label="Deposits" value={data.deposits} currency={data.pref} />
@@ -151,14 +176,9 @@ function SummaryItem({ label, value, currency='INR', negative, emphasize }) {
   )
 }
 
-function StockHoldingsCard({ refreshKey = 0 }) {
+function StockHoldingsCard({ incomes = [], expenses = [], investments = [], loading = false }) {
   const pref = 'INR'
   const fetchAll = React.useCallback(async () => {
-    const [incomes, expenses, investments] = await Promise.all([
-      api.getIncomes(),
-      api.getExpenses(),
-      api.getInvestments(),
-    ])
     const inc = normalizeList(incomes)
     const exp = normalizeList(expenses)
     const inv = normalizeList(investments)
@@ -191,9 +211,23 @@ function StockHoldingsCard({ refreshKey = 0 }) {
       holdings.set(symbol, cur)
     }
 
-    // Buys from Investments (category Stocks)
-    inv.filter(x => (String(x.category || '')).toLowerCase() === 'stocks').forEach(x => {
-      addBuy(x.symbol || x.name || 'UNKNOWN', x.name || x.symbol || 'UNKNOWN', x.quantity, x.buy_price, parseChargesFromNotes(x.notes), x.currency)
+    // Buys from Investments (support both legacy and new schemas)
+    inv.forEach(x => {
+      const cat = String(x.category || '').toLowerCase()
+      const t = String(x.type || '').toLowerCase()
+      const isStock = cat === 'stocks' || t === 'stock' || t === 'stocks'
+      if (!isStock) return
+      const symbol = x.symbol || x.name || 'UNKNOWN'
+      const name = x.name || x.symbol || 'UNKNOWN'
+      const qty = Number(x.quantity) || Number(x.qty) || 0
+      if (qty <= 0) return
+      const charges = parseChargesFromNotes(x.notes)
+      let unit = Number(x.buy_price) || 0
+      if (!unit) {
+        const pv = Number(x.purchase_value) || 0
+        unit = qty > 0 ? (pv / qty) : 0
+      }
+      addBuy(symbol, name, qty, unit, charges, x.currency)
     })
 
     // Buy fallbacks from Expenses titled "Stock Buy <SYMBOL>"
@@ -228,7 +262,7 @@ function StockHoldingsCard({ refreshKey = 0 }) {
     return { rows, currency: pref }
   }, [])
 
-  const { loading, error, data } = useAsync(fetchAll, [refreshKey])
+  const { loading: localLoading, error, data } = useAsync(fetchAll, [incomes, expenses, investments])
   const [quotes, setQuotes] = React.useState({})
   const [qLoading, setQLoading] = React.useState(false)
 
@@ -275,7 +309,7 @@ function StockHoldingsCard({ refreshKey = 0 }) {
         </div>
       </div>
       <div className="card-body">
-        {loading && <div className="text-muted">Loading holdings…</div>}
+        {(loading || localLoading) && <div className="text-muted">Loading holdings…</div>}
         {error && <div className="alert alert-danger">{error}</div>}
         {data && (
           data.rows.length === 0 ? (
