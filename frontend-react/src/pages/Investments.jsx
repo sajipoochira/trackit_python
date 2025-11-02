@@ -153,8 +153,10 @@ export default function Investments() {
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
+              <StocksAccumulatedCard items={items} />
+    </div>
+  )
+}
         </div>
       </div>
       <StocksAccumulatedCard items={items} />
@@ -314,42 +316,34 @@ function StocksAccumulatedCard({ items = [] }){
             <table className="table table-sm align-middle">
               <thead>
                 <tr>
-                  <th>Name</th>
                   <th>Symbol</th>
-                  <th>Type</th>
                   <th className="text-end">Qty</th>
-                  <th className="text-end">Current value ({pref})</th>
-                  <th className="text-end">Purchase value ({pref})</th>
-                  <th>Currency</th>
-                  <th>Actions</th>
+                  <th className="text-end">Cost ({pref})</th>
+                  <th className="text-end">LTP ({pref})</th>
+                  <th className="text-end">Current ({pref})</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r, i) => (
                   <tr key={r.symbol || i}>
-                    <td>{r.name || r.symbol}</td>
                     <td>{r.symbol}</td>
-                    <td>Stocks</td>
                     <td className="text-end">{Number(r.qty) || 0}</td>
-                    <td className="text-end">{r.current != null ? r.current.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'}</td>
                     <td className="text-end">{Number(r.cost || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                    <td>{pref}</td>
-                    <td>
-                      <button className="btn btn-sm btn-outline-secondary" onClick={async ()=>{ setQLoading(true); try { await api.getLtp(r.symbol); await loadQuotes([r.symbol]); } finally { setQLoading(false) }}} disabled={qLoading}>Refresh</button>
-                    </td>
+                    <td className="text-end">{Number.isFinite(r.ltp) ? r.ltp.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'}</td>
+                    <td className="text-end">{r.current != null ? r.current.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan="4" className="text-end fw-semibold">Totals</td>
-                  <td className="text-end fw-semibold">{totals.totalCurr.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                  <td className="text-end fw-semibold">{totals.totalCost.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                  <td>{pref}</td>
                   <td></td>
+                  <td className="text-end fw-semibold">Totals</td>
+                  <td className="text-end fw-semibold">{totals.totalCost.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                  <td></td>
+                  <td className="text-end fw-semibold">{totals.totalCurr.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
                 </tr>
                 <tr>
-                  <td colSpan="7" className="text-end">Profit / Loss ({pref})</td>
+                  <td colSpan="4" className="text-end">Profit / Loss ({pref})</td>
                   <td className="text-end fw-semibold">{totals.pnl.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
                 </tr>
               </tfoot>
