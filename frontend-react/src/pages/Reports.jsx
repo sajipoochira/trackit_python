@@ -57,7 +57,7 @@ export default function Reports(){
           
         </div>
         <div className="card-body">
-          {snapshot.loading && <div className="text-muted">Loading€¦</div>}
+          {snapshot.loading && <div className="text-muted">Loadingï¿½ï¿½</div>}
           {snapshot.error && <div className="alert alert-danger">{snapshot.error}</div>}
           {snapshot.data && (
             <div className="row g-3">
@@ -77,7 +77,7 @@ export default function Reports(){
           <YearPicker year={year} setYear={setYear} />
         </div>
         <div className="card-body">
-          {cashflow.loading && <div className="text-muted">Loading€¦</div>}
+          {cashflow.loading && <div className="text-muted">Loadingï¿½ï¿½</div>}
           {cashflow.error && <div className="alert alert-danger">{cashflow.error}</div>}
           {cashflow.data && (
             <>
@@ -120,7 +120,7 @@ export default function Reports(){
           <YearPicker year={year} setYear={setYear} />
         </div>
         <div className="card-body">
-          {timeline.loading && <div className="text-muted">Loading€¦</div>}
+          {timeline.loading && <div className="text-muted">Loadingï¿½ï¿½</div>}
           {timeline.error && <div className="alert alert-danger">{timeline.error}</div>}
           {timeline.data && (
             <>
@@ -153,7 +153,7 @@ export default function Reports(){
             </>
           )}
           {timeline.data && (
-            <div className="text-muted small mt-2">Baseline (Jan 1): {formatCurrency(timeline.data.baseline_jan1_inr, 'INR')} · Current snapshot: {formatCurrency(timeline.data.current_net_worth_inr, 'INR')}</div>
+            <div className="text-muted small mt-2">Baseline (Jan 1): {formatCurrency(timeline.data.baseline_jan1_inr, 'INR')} ï¿½ Current snapshot: {formatCurrency(timeline.data.current_net_worth_inr, 'INR')}</div>
           )}
         </div>
       </div>

@@ -120,6 +120,13 @@ Response shape returned to the client (example):
   - `GET /api/reports/monthly_expenses/?year=YYYY&month=MM` - expense breakdown in INR
   - `GET /api/reports/monthly_cashflow/?year=YYYY` - monthly income/expense totals and net in INR
   - `GET /api/reports/net_worth_timeline/?year=YYYY` - approximate end-of-month net worth based on baseline + monthly net flows
+<<<<<<< HEAD
+=======
+- Reports
+  - `GET /api/reports/net_worth/` - snapshot totals in INR
+  - `GET /api/reports/monthly_expenses/?year=YYYY&month=MM` - expense breakdown in INR
+  - `GET /api/reports/monthly_cashflow/?year=YYYY` - monthly income/expense totals and net in INR
+>>>>>>> 2f9b487682c5a2dd467d65ecdbaad8844c01c2b0
 
 ## Troubleshooting
 
@@ -141,4 +148,7 @@ Response shape returned to the client (example):
 - React app in `frontend-react` is the primary UI going forward.
 - The legacy `frontend` service in docker-compose has been removed; run the React app locally with Vite.
 - The static `frontend` (HTML/JS) remains in the repo for legacy/testing and may be removed later.
+<<<<<<< HEAD
 
+=======
+>>>>>>> 2f9b487682c5a2dd467d65ecdbaad8844c01c2b0

@@ -741,34 +741,6 @@ class LTPViewSet(viewsets.ViewSet):
             'source': 'indianapi',
         })
 
-    # Bulk latest quotes (cached) — supports both underscore and hyphen paths
-    @action(detail=False, methods=['get'], url_path='latest_bulk')
-    def latest_bulk(self, request):
-        symbols_param = request.query_params.get('symbols')
-        if not symbols_param:
-            return Response({'error': 'symbols query param is required (comma separated)'}, status=status.HTTP_400_BAD_REQUEST)
-        symbols = [s.strip().upper() for s in symbols_param.split(',') if s.strip()]
-        if not symbols:
-            return Response({'error': 'no valid symbols provided'}, status=status.HTTP_400_BAD_REQUEST)
-        quotes = StockQuote.objects.filter(symbol__in=symbols)
-        data = {}
-        for q in quotes:
-            data[q.symbol] = {
-                'symbol': q.symbol,
-                'companyName': q.company_name,
-                'currentPrice': {'BSE': q.bse_price, 'NSE': q.nse_price},
-                'updatedAt': q.updated_at,
-                'ltp': q.nse_price or q.bse_price,
-                'currency': 'INR',
-                'as_of': q.updated_at,
-                'source': 'indianapi',
-            }
-        return Response({'results': data})
-
-    @action(detail=False, methods=['get'], url_path='latest-bulk')
-    def latest_bulk_dash(self, request):
-        return self.latest_bulk(request)
-
 class ReportsViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -810,6 +782,157 @@ class ReportsViewSet(viewsets.ViewSet):
                 'liabilities_inr': total_liabilities_inr,
                 'net_worth_inr': net_worth_inr,
             }
+        })
+
+    @action(detail=False, methods=['get'])
+    def monthly_expenses(self, request):
+        """Aggregate expenses for a given month by category (INR)"""
+        from datetime import date
+        try:
+            year = int(request.query_params.get('year', date.today().year))
+            month = int(request.query_params.get('month', date.today().month))
+        except Exception:
+            return Response({'error': 'Invalid year/month'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Determine month window
+        start_date = date(year, month, 1)
+        if month == 12:
+            end_date = date(year + 1, 1, 1)
+        else:
+            end_date = date(year, month + 1, 1)
+
+        expenses = Expense.objects.filter(user=request.user, date__gte=start_date, date__lt=end_date)
+        summary = {}
+        total_inr = 0.0
+        for e in expenses:
+            cat = e.get_category_display()
+            amt_inr = e.get_amount_in_inr()
+            total_inr += amt_inr
+            summary[cat] = summary.get(cat, 0.0) + amt_inr
+
+        return Response({'year': year, 'month': month, 'total_inr': total_inr, 'by_category_inr': summary})
+
+    @action(detail=False, methods=['get'])
+    def monthly_cashflow(self, request):
+        """Return income vs expense totals per month for a given year (in INR)."""
+        from datetime import date
+        try:
+            year = int(request.query_params.get('year', date.today().year))
+        except Exception:
+            return Response({'error': 'Invalid year'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Preload FX map to reduce DB hits
+        fx_map = {}
+        for r in ExchangeRate.objects.all():
+            fx_map[(r.from_currency, r.to_currency)] = r.rate
+
+        def to_inr(amount, currency):
+            if currency == 'INR':
+                return float(amount)
+            rate = fx_map.get((currency, 'INR'))
+            try:
+                return float(amount) * float(rate) if rate else float(amount)
+            except Exception:
+                return float(amount)
+
+        # Aggregate by month
+        monthly = {m: {'income_inr': 0.0, 'expense_inr': 0.0} for m in range(1, 13)}
+
+        incomes = Income.objects.filter(user=request.user, date__year=year)
+        for inc in incomes:
+            m = inc.date.month
+            monthly[m]['income_inr'] += to_inr(inc.amount, inc.currency)
+
+        expenses = Expense.objects.filter(user=request.user, date__year=year)
+        for exp in expenses:
+            m = exp.date.month
+            monthly[m]['expense_inr'] += to_inr(exp.amount, exp.currency)
+
+        out = []
+        for m in range(1, 13):
+            data = monthly[m]
+            out.append({
+                'month': m,
+                'income_inr': data['income_inr'],
+                'expense_inr': data['expense_inr'],
+                'net_inr': data['income_inr'] - data['expense_inr'],
+            })
+        return Response({'year': year, 'months': out})
+
+    @action(detail=False, methods=['get'])
+    def net_worth_timeline(self, request):
+        """Approximate end-of-month net worth for a year by applying monthly net cashflow to a derived baseline.
+        Baseline is computed from current snapshot minus YTD net cashflow to estimate Jan 1 value.
+        """
+        from datetime import date
+        # Year param
+        try:
+            year = int(request.query_params.get('year', date.today().year))
+        except Exception:
+            return Response({'error': 'Invalid year'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Current snapshot
+        user = request.user
+        assets = Asset.objects.filter(user=user)
+        total_assets_inr = sum(a.get_value_in_inr() for a in assets)
+        liabilities = Liability.objects.filter(user=user)
+        total_liabilities_inr = sum(l.get_current_balance_in_inr() for l in liabilities)
+        investments = Investment.objects.filter(user=user)
+        inv_inr = 0.0
+        for inv in investments:
+            inv_inr += self._to_inr((float(inv.current_value) * float(inv.qty)), inv.currency)
+        money_lent = MoneyLent.objects.filter(user=user)
+        ml_inr = sum(ml.get_outstanding_amount_in_inr() for ml in money_lent)
+        current_net = total_assets_inr + inv_inr + ml_inr - total_liabilities_inr
+
+        # Monthly cashflow for this year
+        # Build a quick FX map to reduce queries here too
+        fx_map = {}
+        for r in ExchangeRate.objects.all():
+            fx_map[(r.from_currency, r.to_currency)] = r.rate
+        def to_inr(amount, currency):
+            if currency == 'INR':
+                return float(amount)
+            rate = fx_map.get((currency, 'INR'))
+            try:
+                return float(amount) * float(rate) if rate else float(amount)
+            except Exception:
+                return float(amount)
+
+        monthly_net = {m: 0.0 for m in range(1, 13)}
+        incomes = Income.objects.filter(user=user, date__year=year)
+        for inc in incomes:
+            monthly_net[inc.date.month] += to_inr(inc.amount, inc.currency)
+        expenses = Expense.objects.filter(user=user, date__year=year)
+        for exp in expenses:
+            monthly_net[exp.date.month] -= to_inr(exp.amount, exp.currency)
+
+        # Derive baseline at Jan 1 as current_net - YTD net up to current month
+        today = date.today()
+        ytd_net = 0.0
+        last_month = 12
+        if year == today.year:
+            last_month = today.month
+        for m in range(1, last_month + 1):
+            ytd_net += monthly_net[m]
+        baseline_jan1 = current_net - ytd_net
+
+        # Build end-of-month timeline: baseline + cumulative net up to each month
+        cumulative = 0.0
+        months = []
+        for m in range(1, 13):
+            cumulative += monthly_net[m]
+            months.append({
+                'month': m,
+                'approx_net_worth_inr': baseline_jan1 + cumulative,
+                'net_flow_inr': monthly_net[m],
+            })
+
+        return Response({
+            'year': year,
+            'baseline_jan1_inr': baseline_jan1,
+            'current_net_worth_inr': current_net,
+            'months': months,
         })
 
     @action(detail=False, methods=['get'])
