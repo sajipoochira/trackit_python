@@ -5,9 +5,9 @@ import { convert as convertFx } from '../ratesStore.js'
 import BulkCreateCard from '../components/BulkCreateCard.jsx'
 import { parseCSV } from '../utils/csv.js'
 
-export default function StockInvestments(){
+export default function StockInvestments() {
   const [refreshKey, setRefreshKey] = React.useState(0)
-  const onChanged = React.useCallback(()=> setRefreshKey(x=>x+1), [])
+  const onChanged = React.useCallback(() => setRefreshKey(x => x + 1), [])
   const [show, setShow] = React.useState({ transfers: false, buy: false, sell: false })
 
   const [incomes, setIncomes] = React.useState([])
@@ -18,19 +18,38 @@ export default function StockInvestments(){
 
   React.useEffect(() => {
     let ok = true
+    const fetchAllPages = async (apiCall) => {
+      let all = []
+      let page = 1
+      while (true) {
+        // Use ?page=X query param. Assuming standard DRF pagination.
+        // If not paginated, API ignores param and returns list/result, which we handle.
+        const q = `?page=${page}`
+        const res = await apiCall(q)
+        const list = Array.isArray(res) ? res : (res?.results || [])
+        all = all.concat(list)
+
+        // Check if there is a next page
+        // Standard DRF returns { count, next, previous, results }
+        if (!res || !res.next) break
+        page++
+      }
+      return all
+    }
+
     const loadAll = async () => {
       setDataError(''); setDataLoading(true)
       try {
         const [inc, exp, inv] = await Promise.all([
-          api.getIncomes(),
-          api.getExpenses(),
-          api.getInvestments(),
+          fetchAllPages((q) => api.getIncomes(q)),
+          fetchAllPages((q) => api.getExpenses(q)),
+          fetchAllPages((q) => api.getInvestments(q)),
         ])
         if (!ok) return
-        setIncomes(Array.isArray(inc) ? inc : (inc?.results || []))
-        setExpenses(Array.isArray(exp) ? exp : (exp?.results || []))
-        setInvestments(Array.isArray(inv) ? inv : (inv?.results || []))
-      } catch(e) {
+        setIncomes(inc)
+        setExpenses(exp)
+        setInvestments(inv)
+      } catch (e) {
         if (ok) setDataError(e?.message || 'Failed to load data')
       } finally {
         if (ok) setDataLoading(false)
@@ -45,7 +64,7 @@ export default function StockInvestments(){
       <h2 className="h4 mb-3">Stock Investments</h2>
       {dataError && <div className="alert alert-danger">{dataError}</div>}
       <div className="mb-2">
-        <button className="btn btn-sm btn-outline-primary" onClick={()=>setRefreshKey(x=>x+1)} disabled={dataLoading}>
+        <button className="btn btn-sm btn-outline-primary" onClick={() => setRefreshKey(x => x + 1)} disabled={dataLoading}>
           {dataLoading ? 'Loading…' : 'Refresh Data'}
         </button>
       </div>
@@ -54,14 +73,14 @@ export default function StockInvestments(){
       <StockHoldingsCard incomes={incomes} expenses={expenses} investments={investments} loading={dataLoading} />
 
       <div className="d-flex gap-2 mb-3">
-        <button className={`btn btn-outline-secondary btn-sm ${show.transfers ? 'active' : ''}`} onClick={()=> setShow(s=>({ ...s, transfers: !s.transfers }))}>Broker Transfers</button>
-        <button className={`btn btn-outline-secondary btn-sm ${show.buy ? 'active' : ''}`} onClick={()=> setShow(s=>({ ...s, buy: !s.buy }))}>Buy Stocks</button>
-        <button className={`btn btn-outline-secondary btn-sm ${show.sell ? 'active' : ''}`} onClick={()=> setShow(s=>({ ...s, sell: !s.sell }))}>Sell Stocks</button>
+        <button className={`btn btn-outline-secondary btn-sm ${show.transfers ? 'active' : ''}`} onClick={() => setShow(s => ({ ...s, transfers: !s.transfers }))}>Broker Transfers</button>
+        <button className={`btn btn-outline-secondary btn-sm ${show.buy ? 'active' : ''}`} onClick={() => setShow(s => ({ ...s, buy: !s.buy }))}>Buy Stocks</button>
+        <button className={`btn btn-outline-secondary btn-sm ${show.sell ? 'active' : ''}`} onClick={() => setShow(s => ({ ...s, sell: !s.sell }))}>Sell Stocks</button>
       </div>
 
-      {show.transfers && <BrokerTransfersCard onChanged={onChanged} onClose={()=> setShow(s=>({ ...s, transfers: false }))} />}
-      {show.buy && <BuyStockCard onChanged={onChanged} onClose={()=> setShow(s=>({ ...s, buy: false }))} />}
-      {show.sell && <SellStockCard onChanged={onChanged} onClose={()=> setShow(s=>({ ...s, sell: false }))} />}
+      {show.transfers && <BrokerTransfersCard onChanged={onChanged} onClose={() => setShow(s => ({ ...s, transfers: false }))} />}
+      {show.buy && <BuyStockCard onChanged={onChanged} onClose={() => setShow(s => ({ ...s, buy: false }))} />}
+      {show.sell && <SellStockCard onChanged={onChanged} onClose={() => setShow(s => ({ ...s, sell: false }))} />}
     </div>
   )
 }
@@ -94,7 +113,7 @@ function parseQtyFromNotes(notes) {
   const n = Number(m[1]); return Number.isFinite(n) ? n : 0
 }
 
-function triggerDownload(filename, content, mime='text/csv'){
+function triggerDownload(filename, content, mime = 'text/csv') {
   try {
     const blob = new Blob([content], { type: mime })
     const url = URL.createObjectURL(blob)
@@ -105,7 +124,7 @@ function triggerDownload(filename, content, mime='text/csv'){
     a.click()
     a.remove()
     URL.revokeObjectURL(url)
-  } catch(_) {}
+  } catch (_) { }
 }
 
 function BrokerSummaryCard({ incomes = [], expenses = [], investments = [], loading = false }) {
@@ -125,9 +144,9 @@ function BrokerSummaryCard({ incomes = [], expenses = [], investments = [], load
       .reduce((s, x) => s + convertAmt(x.amount, x.currency), 0)
     const withdrawals = inc.filter(x => (x.source || '').toLowerCase() === 'broker withdrawal')
       .reduce((s, x) => s + convertAmt(x.amount, x.currency), 0)
-    const sellProceeds = inc.filter(x => (x.title || '').toLowerCase().startsWith('stock sell'))
+    const sellProceeds = inc.filter(x => (x.category || '').toLowerCase() === 'stocks')
       .reduce((s, x) => s + convertAmt(x.amount, x.currency), 0)
-    const buyExpensesFallback = exp.filter(x => (x.title || '').toLowerCase().startsWith('stock buy'))
+    const buyExpensesFallback = exp.filter(x => (x.category || '').toLowerCase() === 'stocks')
       .reduce((s, x) => s + convertAmt(x.amount, x.currency), 0)
     const stockInvestments = inv.filter(x => (String(x.category || '')).toLowerCase() === 'stocks')
     const buysFromInvestments = stockInvestments.reduce((s, x) => {
@@ -157,7 +176,7 @@ function BrokerSummaryCard({ incomes = [], expenses = [], investments = [], load
               <SummaryItem label="Broker Balance" value={data.balance} currency={data.pref} emphasize />
             </div>
             <div className="mt-2 text-end">
-              <button className="btn btn-sm btn-outline-primary" onClick={()=>setManualTick(t=>t+1)}>Refresh Summary</button>
+              <button className="btn btn-sm btn-outline-primary" onClick={() => setManualTick(t => t + 1)}>Refresh Summary</button>
             </div>
           </>
         )}
@@ -166,7 +185,7 @@ function BrokerSummaryCard({ incomes = [], expenses = [], investments = [], load
   )
 }
 
-function SummaryItem({ label, value, currency='INR', negative, emphasize }) {
+function SummaryItem({ label, value, currency = 'INR', negative, emphasize }) {
   const color = emphasize ? 'text-primary' : (negative ? 'text-danger' : 'text-success')
   return (
     <div className="col-md-2 col-6 mb-2">
@@ -187,53 +206,62 @@ function StockHoldingsCard({ incomes = [], expenses = [], investments = [], load
     const breakdowns = new Map() // symbol -> [{ date, qty, unit, currency, charges, source }]
 
     const pushBreakdown = (symbol, entry) => {
-      const key = (symbol || 'UNKNOWN').toUpperCase()
+      const key = (symbol || 'UNKNOWN').toUpperCase().replace(/\s+/g, '')
+      if (!key) return
       const list = breakdowns.get(key) || []
       list.push(entry)
       breakdowns.set(key, list)
     }
 
     const addBuy = (symbol, name, qty, unitPrice, charges, currency, date, source) => {
+      const sym = (symbol || 'UNKNOWN').toUpperCase().replace(/\s+/g, '')
+      if (!sym) return
       const q = Number(qty) || 0
       const price = Number(unitPrice) || 0
       const ch = Number(charges) || 0
       if (q <= 0) return
       const total = q * price + ch
       const totalPref = (currency && currency !== pref) ? (convertFx(total, currency, pref) || total) : total
-      const cur = holdings.get(symbol) || { name: name || symbol, qty: 0, cost: 0 }
+      const cur = holdings.get(sym) || { name: name || sym, qty: 0, cost: 0 }
       cur.qty += q
       cur.cost += totalPref
       if (!cur.name && name) cur.name = name
-      holdings.set(symbol, cur)
-      pushBreakdown(symbol, { date, qty: q, unit: price, currency, charges: ch, source })
+      holdings.set(sym, cur)
+      pushBreakdown(sym, { date, qty: q, unit: price, currency, charges: ch, source })
     }
 
     const addSell = (symbol, qty) => {
+      const sym = (symbol || 'UNKNOWN').toUpperCase().replace(/\s+/g, '')
+      if (!sym) return
       const q = Number(qty) || 0
       if (q <= 0) return
-      const cur = holdings.get(symbol) || { name: symbol, qty: 0, cost: 0 }
-      if (cur.qty <= 0) { holdings.set(symbol, cur); return }
+      const cur = holdings.get(sym) || { name: sym, qty: 0, cost: 0 }
+      if (cur.qty <= 0) { holdings.set(sym, cur); return }
       const avg = cur.qty > 0 ? (cur.cost / cur.qty) : 0
       const reduceQty = Math.min(cur.qty, q)
       cur.qty -= reduceQty
       cur.cost -= avg * reduceQty
-      holdings.set(symbol, cur)
+      holdings.set(sym, cur)
+      // Note: we don't push breakdown for sells currently, but could
     }
 
-    // Buys from Investments (support both legacy and new schemas)
+    // 1. Buys from Investments
+    // Support both legacy (type='stock') and new (category='Stocks' + type='Stocks') schemas
     inv.forEach(x => {
       const cat = String(x.category || '').toLowerCase()
       const t = String(x.type || '').toLowerCase()
       const rawSymbol = (x.symbol || '').toUpperCase().trim()
       const nameCandidate = (x.name || '').toUpperCase().trim()
       const looksLikeSymbol = !!nameCandidate && !nameCandidate.includes(' ') && nameCandidate.length <= 12
-      // Treat as stock if explicit stock category/type, explicit symbol, or name looks like a ticker
+
       const isStock = (cat === 'stocks' || t === 'stock' || t === 'stocks' || !!rawSymbol || looksLikeSymbol)
       if (!isStock) return
+
       const symbol = rawSymbol || (looksLikeSymbol ? nameCandidate : (x.name || 'UNKNOWN'))
       const name = x.name || symbol
       const qty = Number(x.quantity) || Number(x.qty) || 0
       if (qty <= 0) return
+
       const charges = parseChargesFromNotes(x.notes)
       let unit = Number(x.buy_price) || 0
       if (!unit) {
@@ -243,24 +271,51 @@ function StockHoldingsCard({ incomes = [], expenses = [], investments = [], load
       addBuy(symbol, name, qty, unit, charges, x.currency, x.date, 'investment')
     })
 
-    // Buy fallbacks from Expenses titled "Stock Buy <SYMBOL>"
-    exp.filter(x => (x.title || '').toLowerCase().startsWith('stock buy')).forEach(x => {
-      const t = String(x.title || '')
-      const m = t.match(/stock buy\s+(\S+)/i)
-      const symbol = m ? m[1] : 'UNKNOWN'
+    // 2. Buy fallbacks from Expenses 
+    // Matches if category is 'stocks' OR title starts with "Stock Buy"
+    exp.filter(x => {
+      const cat = (x.category || '').toLowerCase()
+      const title = (x.title || '').toLowerCase()
+      return cat === 'stocks' || title.startsWith('stock buy')
+    }).forEach(x => {
+      // Extract symbol from title: "Stock Buy TATA" or "Stock Buy TATA MOTORS"
+      const title = String(x.title || '')
+      // Check for Title pattern
+      let symbol = 'UNKNOWN'
+      const m = title.match(/stock buy[:\s]+(.*)/i)
+      if (m && m[1]) {
+        symbol = m[1]
+      } else if ((x.category || '').toLowerCase() === 'stocks') {
+        // If category is explicitly stocks but title doesn't match pattern, try to find a symbol in notes or just use UNKNOWN
+        // This is a robust fallback
+        symbol = 'Unknown Stock'
+      }
+
       const qty = parseQtyFromNotes(x.notes)
       let unit = 0
       const m2 = String(x.notes || '').match(/@\s*([0-9]+(?:\.[0-9]+)?)/)
       if (m2) { const n = Number(m2[1]); if (Number.isFinite(n)) unit = n }
       const ch = parseChargesFromNotes(x.notes)
+
       addBuy(symbol, symbol, qty, unit, ch, x.currency, x.date, 'expense')
     })
 
-    // Sells from Income titled "Stock Sell <SYMBOL>"
-    inc.filter(x => (x.title || '').toLowerCase().startsWith('stock sell')).forEach(x => {
-      const t = String(x.title || '')
-      const m = t.match(/stock sell\s+(\S+)/i)
-      const symbol = m ? m[1] : 'UNKNOWN'
+    // 3. Sells from Income
+    // Matches if source (or title for safety) starts with "Stock Sell"
+    inc.forEach(x => {
+      const source = (x.source || '').trim()
+      const title = (x.title || '').trim() // API might return title if serializer included it (unlikely but safe)
+      const textToCheck = source || title || ''
+
+      if (!textToCheck.toLowerCase().startsWith('stock sell')) return
+
+      // Extract symbol
+      let symbol = 'UNKNOWN'
+      const m = textToCheck.match(/stock sell[:\s]+(.*)/i)
+      if (m && m[1]) {
+        symbol = m[1]
+      }
+
       const qty = parseQtyFromNotes(x.notes)
       addSell(symbol, qty)
     })
@@ -270,7 +325,7 @@ function StockHoldingsCard({ incomes = [], expenses = [], investments = [], load
       const cost = qty > 0 ? Math.max(0, Number(v.cost) || 0) : 0
       const avg = qty > 0 ? cost / qty : 0
       return { symbol, name: v.name || symbol, qty, avg, cost }
-    }).filter(r => r.qty > 0).sort((a,b)=> a.symbol.localeCompare(b.symbol))
+    }).filter(r => r.qty > 0).sort((a, b) => a.symbol.localeCompare(b.symbol))
 
     return { rows, currency: pref, breakdowns: Object.fromEntries(breakdowns) }
   }, [])
@@ -343,7 +398,7 @@ function StockHoldingsCard({ incomes = [], expenses = [], investments = [], load
                   </tr>
                 </thead>
                 <tbody>
-                  {data.rows.map((r, idx)=> (
+                  {data.rows.map((r, idx) => (
                     <tr key={idx}>
                       <td>{(() => {
                         const sym = String(r.symbol || '').toUpperCase()
@@ -448,7 +503,7 @@ function StockPriceCard() {
       <div className="card-header d-flex align-items-center justify-content-between">
         <strong>Last Traded Price</strong>
         <div className="d-flex align-items-center gap-2">
-          <input className="form-control form-control-sm" style={{ width: 140 }} value={symbol} onChange={e=>setSymbol(e.target.value)} placeholder="Symbol (e.g. EKC)" />
+          <input className="form-control form-control-sm" style={{ width: 140 }} value={symbol} onChange={e => setSymbol(e.target.value)} placeholder="Symbol (e.g. EKC)" />
           <button className="btn btn-sm btn-primary" onClick={fetchNow} disabled={loading}>{loading ? 'Fetching…' : 'Refresh Now'}</button>
         </div>
       </div>
@@ -469,7 +524,7 @@ function StockPriceCard() {
   )
 }
 
-function BrokerTransfersCard({ onChanged, onClose }){
+function BrokerTransfersCard({ onChanged, onClose }) {
   const [type, setType] = React.useState('deposit') // deposit | withdrawal
   const [amount, setAmount] = React.useState('')
   const [currency, setCurrency] = React.useState('INR')
@@ -487,17 +542,19 @@ function BrokerTransfersCard({ onChanged, onClose }){
     setMsg(''); setErr(''); setSaving(true)
     try {
       const payload = {
-        title: type === 'deposit' ? 'Broker Deposit' : 'Broker Withdrawal',
         amount: Number(amount),
         currency,
         date,
         notes,
       }
-      if (type === 'deposit') await api.createExpense(payload)
-      else await api.createIncome(payload)
+      if (type === 'deposit') {
+        await api.createExpense({ ...payload, title: 'Broker Deposit' })
+      } else {
+        await api.createIncome({ ...payload, source: 'Broker Withdrawal' })
+      }
       setMsg('Saved successfully')
       setAmount(''); setDate(''); setNotes('')
-      try { onChanged && onChanged() } catch(_){}
+      try { onChanged && onChanged() } catch (_) { }
     } catch (e1) {
       setErr(e1?.message || 'Failed to save')
     } finally {
@@ -510,8 +567,8 @@ function BrokerTransfersCard({ onChanged, onClose }){
       <div className="card-header d-flex justify-content-between align-items-center">
         <strong>Broker Account Transfers</strong>
         <div className="btn-group">
-          <button className="btn btn-sm btn-outline-secondary" onClick={()=>{ triggerDownload('broker_transfers_template.csv', 'type,amount,currency,date,notes\n') }}>Download CSV Template</button>
-          <button className="btn btn-sm btn-outline-secondary" onClick={()=>{ setBulkText('type,amount,currency,date,notes\ndeposit,1000,INR,2025-01-01,initial'); setBulkMode('csv'); setBulkOpen(true) }}>Bulk Upload</button>
+          <button className="btn btn-sm btn-outline-secondary" onClick={() => { triggerDownload('broker_transfers_template.csv', 'type,amount,currency,date,notes\n') }}>Download CSV Template</button>
+          <button className="btn btn-sm btn-outline-secondary" onClick={() => { setBulkText('type,amount,currency,date,notes\ndeposit,1000,INR,2025-01-01,initial'); setBulkMode('csv'); setBulkOpen(true) }}>Bulk Upload</button>
           {onClose && <button className="btn btn-sm btn-outline-secondary" onClick={onClose}>Hide</button>}
         </div>
       </div>
@@ -522,30 +579,30 @@ function BrokerTransfersCard({ onChanged, onClose }){
           <div className="row g-3">
             <div className="col-md-3">
               <label className="form-label">Type</label>
-              <select className="form-select" value={type} onChange={(e)=>setType(e.target.value)}>
+              <select className="form-select" value={type} onChange={(e) => setType(e.target.value)}>
                 <option value="deposit">Deposit to Broker</option>
                 <option value="withdrawal">Withdrawal from Broker</option>
               </select>
             </div>
             <div className="col-md-3">
               <label className="form-label">Amount</label>
-              <input type="number" step="0.01" className="form-control" value={amount} onChange={(e)=>setAmount(e.target.value)} required />
+              <input type="number" step="0.01" className="form-control" value={amount} onChange={(e) => setAmount(e.target.value)} required />
             </div>
             <div className="col-md-2">
               <label className="form-label">Currency</label>
-              <select className="form-select" value={currency} onChange={(e)=>setCurrency(e.target.value)}>
+              <select className="form-select" value={currency} onChange={(e) => setCurrency(e.target.value)}>
                 <option value="INR">INR</option>
                 <option value="QAR">QAR</option>
               </select>
             </div>
             <div className="col-md-4">
               <label className="form-label">Date</label>
-              <input type="date" className="form-control" value={date} onChange={(e)=>setDate(e.target.value)} required />
+              <input type="date" className="form-control" value={date} onChange={(e) => setDate(e.target.value)} required />
             </div>
           </div>
           <div className="mt-3">
             <label className="form-label">Notes</label>
-            <input type="text" className="form-control" value={notes} onChange={(e)=>setNotes(e.target.value)} placeholder="Optional notes" />
+            <input type="text" className="form-control" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes" />
           </div>
           <div className="mt-3 d-flex gap-2">
             <button className="btn btn-primary" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
@@ -559,23 +616,22 @@ function BrokerTransfersCard({ onChanged, onClose }){
             setText={setBulkText}
             mode={bulkMode}
             setMode={setBulkMode}
-            parseItems={(input)=>{
+            parseItems={(input) => {
               if (bulkMode === 'csv') return parseCSV(input)
               const parsed = JSON.parse(input || '[]'); return Array.isArray(parsed) ? parsed : (parsed ? [parsed] : [])
             }}
-            onSubmit={async (item)=>{
+            onSubmit={async (item) => {
               const t = (item.type || 'deposit').toString().toLowerCase()
               const payload = {
-                title: t === 'deposit' ? 'Broker Deposit' : 'Broker Withdrawal',
                 amount: Number(item.amount) || 0,
                 currency: item.currency || 'INR',
                 date: item.date || '',
                 notes: item.notes || ''
               }
-              if (t === 'deposit') await api.createExpense(payload)
-              else await api.createIncome(payload)
+              if (t === 'deposit') await api.createExpense({ ...payload, title: 'Broker Deposit' })
+              else await api.createIncome({ ...payload, source: 'Broker Withdrawal' })
             }}
-            onCancel={()=>{ setBulkOpen(false); try { onChanged && onChanged() } catch(_){} }}
+            onCancel={() => { setBulkOpen(false); try { onChanged && onChanged() } catch (_) { } }}
             help="CSV headers: type,amount,currency,date,notes. Type: deposit or withdrawal."
           />
         )}
@@ -584,7 +640,7 @@ function BrokerTransfersCard({ onChanged, onClose }){
   )
 }
 
-function BuyStockCard({ onChanged, onClose }){
+function BuyStockCard({ onChanged, onClose }) {
   const [name, setName] = React.useState('')
   const [symbol, setSymbol] = React.useState('')
   const [exchange, setExchange] = React.useState('NSE')
@@ -608,25 +664,27 @@ function BuyStockCard({ onChanged, onClose }){
     const payload = {
       name,
       symbol,
-      quantity: Number(qty),
-      buy_price: Number(price),
+      qty: Number(qty),
+      purchase_value: Number(price),
+      current_value: Number(price),
       currency,
       date,
-      category: 'Stocks',
+      category: 'stocks',
+      type: 'Stocks',
       notes: `Exchange: ${exchange}; Charges: ${charges}; Total: ${formatNumber(total)}`
     }
     try {
       await api.createInvestment(payload)
       setMsg('Buy recorded under Investments')
       setName(''); setSymbol(''); setQty(''); setPrice(''); setCharges('0'); setDate('')
-      try { onChanged && onChanged() } catch(_){}
+      try { onChanged && onChanged() } catch (_) { }
     } catch (e1) {
       try {
         await api.createExpense({ title: `Stock Buy ${symbol}`, amount: total, currency, date, notes: `Exchange: ${exchange}; Qty:${qty} @ ${price}; Charges:${charges}` })
         setMsg('Buy recorded as Expense (fallback)')
         setName(''); setSymbol(''); setQty(''); setPrice(''); setCharges('0'); setDate('')
-        try { onChanged && onChanged() } catch(_){}
-      } catch(e2) {
+        try { onChanged && onChanged() } catch (_) { }
+      } catch (e2) {
         setErr(e2?.message || e1?.message || 'Failed to save')
       }
     } finally {
@@ -639,8 +697,8 @@ function BuyStockCard({ onChanged, onClose }){
       <div className="card-header d-flex justify-content-between align-items-center">
         <strong>Buy Stocks</strong>
         <div className="btn-group">
-          <button className="btn btn-sm btn-outline-secondary" onClick={()=>{ triggerDownload('stock_buys_template.csv', 'name,symbol,exchange,qty,unit_price,charges,currency,date\n') }}>Download CSV Template</button>
-          <button className="btn btn-sm btn-outline-secondary" onClick={()=>{ setBulkText('name,symbol,exchange,qty,unit_price,charges,currency,date\nABC Ltd,ABC,NSE,10,100,5,INR,2025-01-01'); setBulkMode('csv'); setBulkOpen(true) }}>Bulk Upload</button>
+          <button className="btn btn-sm btn-outline-secondary" onClick={() => { triggerDownload('stock_buys_template.csv', 'name,symbol,exchange,qty,unit_price,charges,currency,date\n') }}>Download CSV Template</button>
+          <button className="btn btn-sm btn-outline-secondary" onClick={() => { setBulkText('name,symbol,exchange,qty,unit_price,charges,currency,date\nABC Ltd,ABC,NSE,10,100,5,INR,2025-01-01'); setBulkMode('csv'); setBulkOpen(true) }}>Bulk Upload</button>
           {onClose && <button className="btn btn-sm btn-outline-secondary" onClick={onClose}>Hide</button>}
         </div>
       </div>
@@ -651,40 +709,40 @@ function BuyStockCard({ onChanged, onClose }){
           <div className="row g-3">
             <div className="col-md-3">
               <label className="form-label">Stock Name</label>
-              <input className="form-control" value={name} onChange={(e)=>setName(e.target.value)} required />
+              <input className="form-control" value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
             <div className="col-md-2">
               <label className="form-label">Symbol</label>
-              <input className="form-control" value={symbol} onChange={(e)=>setSymbol(e.target.value)} required />
+              <input className="form-control" value={symbol} onChange={(e) => setSymbol(e.target.value)} required />
             </div>
             <div className="col-md-2">
               <label className="form-label">Exchange</label>
-              <input className="form-control" value={exchange} onChange={(e)=>setExchange(e.target.value)} />
+              <input className="form-control" value={exchange} onChange={(e) => setExchange(e.target.value)} />
             </div>
             <div className="col-md-2">
               <label className="form-label">Qty</label>
-              <input type="number" step="1" className="form-control" value={qty} onChange={(e)=>setQty(e.target.value)} required />
+              <input type="number" step="1" className="form-control" value={qty} onChange={(e) => setQty(e.target.value)} required />
             </div>
             <div className="col-md-1">
               <label className="form-label">Unit Price</label>
-              <input type="number" step="0.01" className="form-control" value={price} onChange={(e)=>setPrice(e.target.value)} required />
+              <input type="number" step="0.01" className="form-control" value={price} onChange={(e) => setPrice(e.target.value)} required />
             </div>
             <div className="col-md-2">
               <label className="form-label">Charges</label>
-              <input type="number" step="0.01" className="form-control" value={charges} onChange={(e)=>setCharges(e.target.value)} />
+              <input type="number" step="0.01" className="form-control" value={charges} onChange={(e) => setCharges(e.target.value)} />
             </div>
           </div>
           <div className="row g-3 mt-2">
             <div className="col-md-2">
               <label className="form-label">Currency</label>
-              <select className="form-select" value={currency} onChange={(e)=>setCurrency(e.target.value)}>
+              <select className="form-select" value={currency} onChange={(e) => setCurrency(e.target.value)}>
                 <option value="INR">INR</option>
                 <option value="QAR">QAR</option>
               </select>
             </div>
             <div className="col-md-3">
               <label className="form-label">Date</label>
-              <input type="date" className="form-control" value={date} onChange={(e)=>setDate(e.target.value)} required />
+              <input type="date" className="form-control" value={date} onChange={(e) => setDate(e.target.value)} required />
             </div>
             <div className="col-md-7 d-flex align-items-end justify-content-end">
               <div className="text-end">
@@ -704,11 +762,11 @@ function BuyStockCard({ onChanged, onClose }){
             setText={setBulkText}
             mode={bulkMode}
             setMode={setBulkMode}
-            parseItems={(input)=>{
+            parseItems={(input) => {
               if (bulkMode === 'csv') return parseCSV(input)
               const parsed = JSON.parse(input || '[]'); return Array.isArray(parsed) ? parsed : (parsed ? [parsed] : [])
             }}
-            onSubmit={async (item)=>{
+            onSubmit={async (item) => {
               const quantity = Number(item.qty) || Number(item.quantity) || 0
               const unit = Number(item.unit_price) || Number(item.price) || Number(item.buy_price) || 0
               const ch = Number(item.charges) || 0
@@ -718,11 +776,14 @@ function BuyStockCard({ onChanged, onClose }){
               const payload = {
                 name: item.name || '',
                 symbol: item.symbol || '',
-                quantity,
-                buy_price: unit,
+                qty: quantity,
+                purchase_value: unit,
+                current_value: unit,
                 currency: cur,
                 date: dt,
-                category: 'Stocks',
+                date: dt,
+                category: 'stocks',
+                type: 'Stocks',
                 notes: `Exchange: ${item.exchange || ''}; Charges: ${ch}; Total: ${formatNumber(total2)}`
               }
               try {
@@ -731,7 +792,7 @@ function BuyStockCard({ onChanged, onClose }){
                 await api.createExpense({ title: `Stock Buy ${payload.symbol}`, amount: total2, currency: cur, date: dt, notes: `Exchange: ${item.exchange || ''}; Qty:${quantity} @ ${unit}; Charges:${ch}` })
               }
             }}
-            onCancel={()=>{ setBulkOpen(false); try { onChanged && onChanged() } catch(_){} }}
+            onCancel={() => { setBulkOpen(false); try { onChanged && onChanged() } catch (_) { } }}
             help="CSV headers: name,symbol,exchange,qty,unit_price,charges,currency,date"
           />
         )}
@@ -740,7 +801,7 @@ function BuyStockCard({ onChanged, onClose }){
   )
 }
 
-function SellStockCard({ onChanged, onClose }){
+function SellStockCard({ onChanged, onClose }) {
   const [symbol, setSymbol] = React.useState('')
   const [exchange, setExchange] = React.useState('NSE')
   const [qty, setQty] = React.useState('')
@@ -761,10 +822,10 @@ function SellStockCard({ onChanged, onClose }){
     e.preventDefault()
     setMsg(''); setErr(''); setSaving(true)
     try {
-      await api.createIncome({ title: `Stock Sell ${symbol}`, amount: proceeds, currency, date, notes: `Exchange: ${exchange}; Qty:${qty} @ ${price}; Charges:${charges}` })
+      await api.createIncome({ source: `Stock Sell ${symbol}`, amount: proceeds, currency, date, category: 'stocks', type: 'stocks', notes: `Exchange: ${exchange}; Qty:${qty} @ ${price}; Charges:${charges}` })
       setMsg('Sell recorded as Income')
       setSymbol(''); setQty(''); setPrice(''); setCharges('0'); setDate('')
-      try { onChanged && onChanged() } catch(_){}
+      try { onChanged && onChanged() } catch (_) { }
     } catch (e1) {
       setErr(e1?.message || 'Failed to save')
     } finally {
@@ -777,8 +838,8 @@ function SellStockCard({ onChanged, onClose }){
       <div className="card-header d-flex justify-content-between align-items-center">
         <strong>Sell Stocks</strong>
         <div className="btn-group">
-          <button className="btn btn-sm btn-outline-secondary" onClick={()=>{ triggerDownload('stock_sells_template.csv', 'symbol,exchange,qty,unit_price,charges,currency,date\n') }}>Download CSV Template</button>
-          <button className="btn btn-sm btn-outline-secondary" onClick={()=>{ setBulkText('symbol,exchange,qty,unit_price,charges,currency,date\nABC,NSE,5,120,3,INR,2025-01-02'); setBulkMode('csv'); setBulkOpen(true) }}>Bulk Upload</button>
+          <button className="btn btn-sm btn-outline-secondary" onClick={() => { triggerDownload('stock_sells_template.csv', 'symbol,exchange,qty,unit_price,charges,currency,date\n') }}>Download CSV Template</button>
+          <button className="btn btn-sm btn-outline-secondary" onClick={() => { setBulkText('symbol,exchange,qty,unit_price,charges,currency,date\nABC,NSE,5,120,3,INR,2025-01-02'); setBulkMode('csv'); setBulkOpen(true) }}>Bulk Upload</button>
           {onClose && <button className="btn btn-sm btn-outline-secondary" onClick={onClose}>Hide</button>}
         </div>
       </div>
@@ -789,36 +850,36 @@ function SellStockCard({ onChanged, onClose }){
           <div className="row g-3">
             <div className="col-md-3">
               <label className="form-label">Symbol</label>
-              <input className="form-control" value={symbol} onChange={(e)=>setSymbol(e.target.value)} required />
+              <input className="form-control" value={symbol} onChange={(e) => setSymbol(e.target.value)} required />
             </div>
             <div className="col-md-2">
               <label className="form-label">Exchange</label>
-              <input className="form-control" value={exchange} onChange={(e)=>setExchange(e.target.value)} />
+              <input className="form-control" value={exchange} onChange={(e) => setExchange(e.target.value)} />
             </div>
             <div className="col-md-2">
               <label className="form-label">Qty</label>
-              <input type="number" step="1" className="form-control" value={qty} onChange={(e)=>setQty(e.target.value)} required />
+              <input type="number" step="1" className="form-control" value={qty} onChange={(e) => setQty(e.target.value)} required />
             </div>
             <div className="col-md-2">
               <label className="form-label">Unit Price</label>
-              <input type="number" step="0.01" className="form-control" value={price} onChange={(e)=>setPrice(e.target.value)} required />
+              <input type="number" step="0.01" className="form-control" value={price} onChange={(e) => setPrice(e.target.value)} required />
             </div>
             <div className="col-md-3">
               <label className="form-label">Charges</label>
-              <input type="number" step="0.01" className="form-control" value={charges} onChange={(e)=>setCharges(e.target.value)} />
+              <input type="number" step="0.01" className="form-control" value={charges} onChange={(e) => setCharges(e.target.value)} />
             </div>
           </div>
           <div className="row g-3 mt-2">
             <div className="col-md-2">
               <label className="form-label">Currency</label>
-              <select className="form-select" value={currency} onChange={(e)=>setCurrency(e.target.value)}>
+              <select className="form-select" value={currency} onChange={(e) => setCurrency(e.target.value)}>
                 <option value="INR">INR</option>
                 <option value="QAR">QAR</option>
               </select>
             </div>
             <div className="col-md-3">
               <label className="form-label">Date</label>
-              <input type="date" className="form-control" value={date} onChange={(e)=>setDate(e.target.value)} required />
+              <input type="date" className="form-control" value={date} onChange={(e) => setDate(e.target.value)} required />
             </div>
             <div className="col-md-7 d-flex align-items-end justify-content-end">
               <div className="text-end">
@@ -838,11 +899,11 @@ function SellStockCard({ onChanged, onClose }){
             setText={setBulkText}
             mode={bulkMode}
             setMode={setBulkMode}
-            parseItems={(input)=>{
+            parseItems={(input) => {
               if (bulkMode === 'csv') return parseCSV(input)
               const parsed = JSON.parse(input || '[]'); return Array.isArray(parsed) ? parsed : (parsed ? [parsed] : [])
             }}
-            onSubmit={async (item)=>{
+            onSubmit={async (item) => {
               const quantity = Number(item.qty) || Number(item.quantity) || 0
               const unit = Number(item.unit_price) || Number(item.price) || 0
               const ch = Number(item.charges) || 0
@@ -851,7 +912,7 @@ function SellStockCard({ onChanged, onClose }){
               const proceeds2 = quantity * unit - ch
               await api.createIncome({ title: `Stock Sell ${item.symbol || ''}`, amount: proceeds2, currency: cur, date: dt, notes: `Exchange: ${item.exchange || ''}; Qty:${quantity} @ ${unit}; Charges:${ch}` })
             }}
-            onCancel={()=>{ setBulkOpen(false); try { onChanged && onChanged() } catch(_){} }}
+            onCancel={() => { setBulkOpen(false); try { onChanged && onChanged() } catch (_) { } }}
             help="CSV headers: symbol,exchange,qty,unit_price,charges,currency,date"
           />
         )}

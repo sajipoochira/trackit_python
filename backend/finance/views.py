@@ -14,6 +14,10 @@ from dateutil.relativedelta import relativedelta
 import logging
 import os
 import requests
+from django.core.cache import cache
+from django.utils import timezone
+
+CACHE_TTL = 3600 # 1 hour
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -656,11 +660,8 @@ class LTPViewSet(viewsets.ViewSet):
     permission_classes = [AllowAny]
 
     @action(detail=False, methods=['get'])
-    def get_price(self, request):
-        symbol = request.query_params.get('symbol') or request.query_params.get('name')
-        if not symbol:
-            return Response({'error': 'symbol (or name) query param is required'}, status=status.HTTP_400_BAD_REQUEST)
-
+    def _fetch_from_api(self, symbol):
+        """Helper to fetch from external API"""
         try:
             # Prefer Indian API for currentPrice (BSE/NSE)
             base_url = os.environ.get('INDIANAPI_BASE_URL', 'https://stock.indianapi.in')
@@ -669,68 +670,80 @@ class LTPViewSet(viewsets.ViewSet):
             url = f"{base_url}/stock?name={symbol}"
             headers = {}
             if api_key:
-                # Send both common auth styles; upstream may accept either
                 headers['Authorization'] = f"Bearer {api_key}"
                 headers['x-api-key'] = api_key
 
             logger.debug(f"Fetching currentPrice from Indian API for {symbol}")
             resp = requests.get(url, headers=headers, timeout=15)
             if resp.status_code != 200:
-                return Response({'error': f'Upstream error: {resp.status_code}'}, status=status.HTTP_502_BAD_GATEWAY)
+                logger.error(f"Upstream error for {symbol}: {resp.status_code}")
+                return None
 
             data = resp.json() if resp.content else {}
-            
             current_price = (data or {}).get('currentPrice') or {}
-            bse = current_price.get('BSE')
-            nse = current_price.get('NSE')
             
+            # Additional check: sometimes API returns successfully but empty data
+            if not current_price and not (data or {}).get('companyName'):
+                 return None
 
-            if not bse and not nse:
-                return Response({'error': 'currentPrice not available from upstream'}, status=status.HTTP_404_NOT_FOUND)
-
-            # Cache/update in DB
-            company_name = (data or {}).get('companyName')
-            sq, _ = StockQuote.objects.update_or_create(
-                symbol=symbol.upper(),
-                defaults={
-                    'company_name': company_name,
-                    'bse_price': bse,
-                    'nse_price': nse,
-                }
-            )
-
-            # Unified fields for easier client consumption (non-breaking addition)
-            chosen_ltp = nse or bse
-            payload = {
-                'symbol': symbol.upper(),
-                'companyName': company_name,
-                'currentPrice': {
-                    'BSE': sq.bse_price,
-                    'NSE': sq.nse_price
-                },
-                'updatedAt': sq.updated_at,
-                'ltp': chosen_ltp,
-                'currency': 'INR',
-                'as_of': sq.updated_at,
-                'source': 'indianapi',
-            }
-            return Response(payload, status=status.HTTP_200_OK)
-
+            return data
         except Exception as e:
-            logger.error(f"Error fetching price for {symbol}: {str(e)}")
-            return Response({'error': f'Failed to fetch price for {symbol}: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error(f"Error fetching API for {symbol}: {str(e)}")
+            return None
 
-    @action(detail=False, methods=['get'])
-    def latest(self, request):
-        symbol = request.query_params.get('symbol')
-        if not symbol:
-            return Response({'error': 'symbol is required'}, status=status.HTTP_400_BAD_REQUEST)
-        sq = StockQuote.objects.filter(symbol=symbol.upper()).first()
+    def _get_quote_tiered(self, symbol):
+        """
+        Get quote using tiered strategy:
+        1. Memory Cache
+        2. Database (if fresh < 1 hour)
+        3. External API
+        """
+        symbol = symbol.upper().strip()
+        cache_key = f'ltp_{symbol}'
+        
+        # Tier 1: Memory Cache
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return cached_data
+
+        # Tier 2: Database check
+        # Check if we have a recent enough DB entry to populate cache
+        # We define "fresh" as updated within last hour
+        cutoff = timezone.now() - timedelta(seconds=CACHE_TTL)
+        sq = StockQuote.objects.filter(symbol=symbol).first()
+        
+        need_api_fetch = True
+        if sq:
+            if sq.updated_at >= cutoff:
+                need_api_fetch = False
+                
+        if need_api_fetch:
+            # Tier 3: External API
+            api_data = self._fetch_from_api(symbol)
+            if api_data:
+                current_price = (api_data or {}).get('currentPrice') or {}
+                bse = current_price.get('BSE')
+                nse = current_price.get('NSE')
+                company_name = (api_data or {}).get('companyName')
+                
+                # Update DB
+                sq, _ = StockQuote.objects.update_or_create(
+                    symbol=symbol,
+                    defaults={
+                        'company_name': company_name,
+                        'bse_price': bse,
+                        'nse_price': nse,
+                    }
+                )
+        
+        # Refetch/Re-verify SQ from DB (it might be old if API failed, but we still return it as fallback if exists)
+        sq = StockQuote.objects.filter(symbol=symbol).first()
         if not sq:
-            return Response({'error': 'No cached quote'}, status=status.HTTP_404_NOT_FOUND)
-        # Provide unified fields in latest as well
+            return None # No data anywhere
+
+        # Construct unified payload
         ltp = sq.nse_price or sq.bse_price
-        return Response({
+        payload = {
             'symbol': sq.symbol,
             'companyName': sq.company_name,
             'currentPrice': {'BSE': sq.bse_price, 'NSE': sq.nse_price},
@@ -738,8 +751,64 @@ class LTPViewSet(viewsets.ViewSet):
             'ltp': ltp,
             'currency': 'INR',
             'as_of': sq.updated_at,
-            'source': 'indianapi',
-        })
+            'source': 'cache/db' if not need_api_fetch else 'indianapi',
+        }
+        
+        # Set Memory Cache
+        cache.set(cache_key, payload, CACHE_TTL)
+        
+        return payload
+
+    @action(detail=False, methods=['get'])
+    def get_price(self, request):
+        symbol = request.query_params.get('symbol') or request.query_params.get('name')
+        if not symbol:
+            return Response({'error': 'symbol (or name) query param is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        data = self._get_quote_tiered(symbol)
+        if not data:
+             return Response({'error': f'Could not fetch quote for {symbol}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'])
+    def latest(self, request):
+        symbol = request.query_params.get('symbol')
+        if not symbol:
+            return Response({'error': 'symbol is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Reuse tiered logic for latest too as it ensures freshness
+        data = self._get_quote_tiered(symbol)
+        if not data:
+             return Response({'error': 'No cached quote'}, status=status.HTTP_404_NOT_FOUND)
+             
+        return Response(data)
+
+    def _build_latest_bulk(self, request):
+        symbols_param = request.query_params.get('symbols')
+        if not symbols_param:
+            return Response({'error': 'symbols query param is required (comma separated)'}, status=status.HTTP_400_BAD_REQUEST)
+        symbols = [s.strip().upper() for s in symbols_param.split(',') if s.strip()]
+        if not symbols:
+            return Response({'results': {}})
+            
+        data = {}
+        for sym in symbols:
+            quote = self._get_quote_tiered(sym)
+            if quote:
+                data[sym] = quote
+                
+        return Response({'results': data})
+
+
+    @action(detail=False, methods=['get'], url_path='latest_bulk')
+    def latest_bulk(self, request):
+        return self._build_latest_bulk(request)
+
+    @action(detail=False, methods=['get'], url_path='latest-bulk')
+    def latest_bulk_dash(self, request):
+        return self._build_latest_bulk(request)
+
 
 class ReportsViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
@@ -1086,28 +1155,3 @@ class ReportsViewSet(viewsets.ViewSet):
             'months': months,
         })
 
-    def _build_latest_bulk(self, request):
-        symbols_param = request.query_params.get('symbols')
-        if not symbols_param:
-            return Response({'error': 'symbols query param is required (comma separated)'}, status=status.HTTP_400_BAD_REQUEST)
-        symbols = [s.strip().upper() for s in symbols_param.split(',') if s.strip()]
-        if not symbols:
-            return Response({'error': 'no valid symbols provided'}, status=status.HTTP_400_BAD_REQUEST)
-        quotes = StockQuote.objects.filter(symbol__in=symbols)
-        data = {}
-        for q in quotes:
-            data[q.symbol] = {
-                'symbol': q.symbol,
-                'companyName': q.company_name,
-                'currentPrice': {'BSE': q.bse_price, 'NSE': q.nse_price},
-                'updatedAt': q.updated_at,
-            }
-        return Response({'results': data})
-
-    @action(detail=False, methods=['get'], url_path='latest_bulk')
-    def latest_bulk(self, request):
-        return self._build_latest_bulk(request)
-
-    @action(detail=False, methods=['get'], url_path='latest-bulk')
-    def latest_bulk_dash(self, request):
-        return self._build_latest_bulk(request)

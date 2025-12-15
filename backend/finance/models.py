@@ -49,6 +49,7 @@ class Income(models.Model):
         ('commission', 'Commission'),
         ('pension', 'Pension'),
         ('gift', 'Gift'),
+        ('stocks', 'Stocks'),
         ('other', 'Other'),
     ]
     
@@ -174,6 +175,7 @@ class Expense(models.Model):
         ('investment', 'Investment'),
         ('insurance', 'Insurance'),
         ('rent', 'Rent'),
+        ('stocks', 'Stocks'),
         ('groceries', 'Groceries'),
         ('fuel', 'Fuel'),
         ('other', 'Other'),

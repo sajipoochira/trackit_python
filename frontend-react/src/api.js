@@ -52,7 +52,7 @@ export class ApiService {
     })
     if (!res.ok) {
       let text = await res.text();
-      try { const j = JSON.parse(text); text = j.detail || text } catch(_) {}
+      try { const j = JSON.parse(text); text = j.detail || text } catch (_) { }
       throw new Error(text || 'Login failed');
     }
     const data = await res.json();
@@ -91,17 +91,17 @@ export class ApiService {
   getCurrentUser() { return this.request('/auth/me/'); }
 
   // Investments
-  getInvestments() { return this.request('/investments/'); }
+  getInvestments(query = '') { return this.request(`/investments/${query}`); }
   createInvestment(payload) { return this.request('/investments/', { method: 'POST', body: JSON.stringify(payload) }); }
   updateInvestment(id, payload) { return this.request(`/investments/${id}/`, { method: 'PUT', body: JSON.stringify(payload) }); }
   deleteInvestment(id) { return this.request(`/investments/${id}/`, { method: 'DELETE' }); }
   // Income
-  getIncomes() { return this.request('/incomes/'); }
+  getIncomes(query = '') { return this.request(`/incomes/${query}`); }
   createIncome(payload) { return this.request('/incomes/', { method: 'POST', body: JSON.stringify(payload) }); }
   updateIncome(id, payload) { return this.request(`/incomes/${id}/`, { method: 'PUT', body: JSON.stringify(payload) }); }
   deleteIncome(id) { return this.request(`/incomes/${id}/`, { method: 'DELETE' }); }
   // Expenses
-  getExpenses() { return this.request('/expenses/'); }
+  getExpenses(query = '') { return this.request(`/expenses/${query}`); }
   createExpense(payload) { return this.request('/expenses/', { method: 'POST', body: JSON.stringify(payload) }); }
   updateExpense(id, payload) { return this.request(`/expenses/${id}/`, { method: 'PUT', body: JSON.stringify(payload) }); }
   deleteExpense(id) { return this.request(`/expenses/${id}/`, { method: 'DELETE' }); }
